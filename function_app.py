@@ -41,5 +41,6 @@ async def orc(req: func.HttpRequest) -> func.HttpResponse:
         result = await orchestrator.answer(question)
 
         return func.HttpResponse(json.dumps(result), mimetype="application/json", status_code=200)
+    
     else:
         return func.HttpResponse('{"error": "no question found in json input"}', mimetype="application/json", status_code=200)

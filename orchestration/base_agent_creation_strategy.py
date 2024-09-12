@@ -1,7 +1,7 @@
 import os
 
 class BaseAgentCreationStrategy:
-    def create_agents(self, conversation_summary, llm_config):
+    def create_agents(self, llm_config, conversation_summary):
         raise NotImplementedError("This method should be overridden in subclasses.")
     
     def _read_prompt(self, agent_name, placeholders=None):
