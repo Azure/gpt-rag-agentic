@@ -1,10 +1,12 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__blobstorage__/
 *.py[cod]
 *$py.class
 local/
 local.settings.json
 __*/*
+
 
 .vscode*
 
