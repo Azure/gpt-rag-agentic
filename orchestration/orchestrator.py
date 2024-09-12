@@ -42,7 +42,7 @@ class Orchestrator():
         self.llm_config = self._get_llm_config()
   
         # Agentic configuration
-        strategy_type = os.getenv('AUTOGEN_ORCHESTRATOR_STRATEGY', 'default')   
+        strategy_type = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'default')   
         self.agent_creation_strategy = AgentCreationStrategyFactory.get_creation_strategy(strategy_type)
         self.max_rounds = os.environ.get('AUTOGEN_MAX_ROUNDS', 5) 
         
