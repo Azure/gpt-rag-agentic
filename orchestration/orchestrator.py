@@ -109,55 +109,56 @@ class Orchestrator():
         # sys.stdout = captured_output
 
         # Use warnings library to catch autogen UserWarning
-        with warnings.catch_warnings(record=True) as w:
+        # with warnings.catch_warnings(record=True) as w:
 
-            # 5) Initiate group chat
-            logging.info(f"[agentic_orchestrator] {self.short_id} initiating chat.")                
-            chat_result = agents[0].initiate_chat(
-                manager, 
-                message=ask,
-                summary_method="last_msg"
-            )
-            
-            # print and reset stdout to its default value
-            # logging.info(f"[agentic_orchestrator] {self.short_id} group chat thought process: \n{captured_output.getvalue()}.")
-            # sys.stdout = sys.__stdout__
+        # 5) Initiate group chat
+        logging.info(f"[agentic_orchestrator] {self.short_id} initiating chat.")                
+        chat_result = agents[0].initiate_chat(
+            manager, 
+            message=ask,
+            summary_method="last_msg"
+        )
+        
+        # print and reset stdout to its default value
+        # logging.info(f"[agentic_orchestrator] {self.short_id} group chat thought process: \n{captured_output.getvalue()}.")
+        # sys.stdout = sys.__stdout__
 
-            # 6) Generate answer dictionary containing the conversation ID, the actual answer, sources (data points) and the thought process.
-            logging.info(f"[agentic_orchestrator] {self.short_id} generating answer dictionary.")                     
-            answer_dict = {
-                "conversation_id": self.conversation_id,
-                "answer": "",
-                "data_points": "",
-                "thoughts": "" # captured_output.getvalue()
-            }
-            if chat_result and chat_result.summary:
-                answer_dict['answer'] = chat_result.summary
-                if len(chat_result.chat_history) >= 2 and chat_result.chat_history[-2]['role'] == 'tool':
-                    answer_dict['data_points'] = chat_result.chat_history[-2]['content']
-            else:
-                logging.info(f"[agentic_orchestrator] {self.short_id} No valid response generated.")
-                # Check if there's a warning and if it contains content filtering information
-                if len(w) > 0 and 'finish_reason=\'content_filter\'' in str(w[-1].message):
-                    answer_dict['answer'] = "The content was blocked due to content filtering."
+        # 6) Generate answer dictionary containing the conversation ID, the actual answer, sources (data points) and the thought process.
+        logging.info(f"[agentic_orchestrator] {self.short_id} generating answer dictionary.")                     
+        answer_dict = {
+            "conversation_id": self.conversation_id,
+            "answer": "",
+            "data_points": "",
+            "thoughts": "" # captured_output.getvalue()
+        }
+        if chat_result and chat_result.summary:
+            answer_dict['answer'] = chat_result.summary
+            if len(chat_result.chat_history) >= 2 and chat_result.chat_history[-2]['role'] == 'tool':
+                answer_dict['data_points'] = chat_result.chat_history[-2]['content']
+        else:
+            logging.info(f"[agentic_orchestrator] {self.short_id} No valid response generated.")
+            # Check if there's a warning and if it contains content filtering information
+            # if len(w) > 0 and 'finish_reason=\'content_filter\'' in str(w[-1].message):
+                # answer_dict['answer'] = "The content was blocked due to content filtering."
+            answer_dict['answer'] = "The content was blocked due to content filtering."
 
-            # 7) Update conversation in db
-            logging.info(f"[agentic_orchestrator] {self.short_id} updating conversation.")                
-            history.append({"role": "user", "content": ask})        
-            history.append({"role": "assistant", "content": answer_dict['answer']})
-            response_time = round(time.time() - start_time, 2)
-            interaction = {
-                'user_id': self.client_principal['id'], 
-                'user_name': self.client_principal['name'], 
-                'response_time': response_time
-            }
-            interaction.update(answer_dict)
-            conversation_data = conversation.get('conversation_data', {'start_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'interactions': []})
-            conversation_data['interactions'].append(interaction)
-            conversation['conversation_data'] = conversation_data
-            conversation['history'] = history
-            conversation = await self.cosmosdb.update_document(self.conversations_container, conversation)
+        # 7) Update conversation in db
+        logging.info(f"[agentic_orchestrator] {self.short_id} updating conversation.")                
+        history.append({"role": "user", "content": ask})        
+        history.append({"role": "assistant", "content": answer_dict['answer']})
+        response_time = round(time.time() - start_time, 2)
+        interaction = {
+            'user_id': self.client_principal['id'], 
+            'user_name': self.client_principal['name'], 
+            'response_time': response_time
+        }
+        interaction.update(answer_dict)
+        conversation_data = conversation.get('conversation_data', {'start_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'interactions': []})
+        conversation_data['interactions'].append(interaction)
+        conversation['conversation_data'] = conversation_data
+        conversation['history'] = history
+        conversation = await self.cosmosdb.update_document(self.conversations_container, conversation)
 
 
-            logging.info(f"[agentic_orchestrator] {self.short_id} finished conversation flow. {response_time} seconds.")         
-            return answer_dict
+        logging.info(f"[agentic_orchestrator] {self.short_id} finished conversation flow. {response_time} seconds.")         
+        return answer_dict
