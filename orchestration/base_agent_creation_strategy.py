@@ -1,6 +1,6 @@
 import os
 
-class AgentCreationStrategy:
+class BaseAgentCreationStrategy:
     def create_agents(self, conversation_summary, llm_config):
         raise NotImplementedError("This method should be overridden in subclasses.")
     

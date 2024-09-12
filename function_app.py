@@ -35,9 +35,8 @@ async def orc(req: func.HttpRequest) -> func.HttpResponse:
 
     if question:
 
-        strategy_type = os.getenv('ORCHESTRATOR_STRATEGY', 'default')        
-
-        orchestrator = Orchestrator(conversation_id, client_principal, strategy_type)
+   
+        orchestrator = Orchestrator(conversation_id, client_principal)
 
         result = await orchestrator.answer(question)
 

@@ -1,6 +1,6 @@
 from .default_agent_creation_strategy import DefaultAgentCreationStrategy
 
-class AgentCreatorFactory:
+class AgentCreationStrategyFactory:
     @staticmethod
     def get_creation_strategy(strategy_type: str):
         if strategy_type == 'default':

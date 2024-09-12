@@ -1,9 +1,9 @@
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from tools import vector_index_retrieve
 
-from .agent_creation_strategy import AgentCreationStrategy
+from .base_agent_creation_strategy import BaseAgentCreationStrategy
 
-class DefaultAgentCreationStrategy(AgentCreationStrategy):
+class DefaultAgentCreationStrategy(BaseAgentCreationStrategy):
     def create_agents(self, conversation_summary, llm_config):
         """
         Default creation strategy that creates the basic agents and registers functions.
@@ -35,3 +35,6 @@ class DefaultAgentCreationStrategy(AgentCreationStrategy):
         )
 
         return [user_proxy, assistant]
+    
+
+            
