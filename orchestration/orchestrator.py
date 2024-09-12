@@ -42,8 +42,8 @@ class Orchestrator():
         self.llm_config = self._get_llm_config()
   
         # Agentic configuration
-        strategy_type = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'default')   
-        self.agent_creation_strategy = AgentCreationStrategyFactory.get_creation_strategy(strategy_type)
+        self.strategy_type = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'default')   
+        self.agent_creation_strategy = AgentCreationStrategyFactory.get_creation_strategy(self.strategy_type)
         self.max_rounds = os.environ.get('AUTOGEN_MAX_ROUNDS', 5) 
         
     def _get_llm_config(self):
@@ -86,17 +86,19 @@ class Orchestrator():
         logging.info(f"[agentic_orchestrator] {self.short_id} summary: {conversation_summary[:100]}.")
 
         # 3) Create Agents and Register Functions using the selected strategy
+        logging.info(f"[agentic_orchestrator] {self.short_id} creating agents using {self.strategy_type} strategy.")        
         agents = self.agent_creation_strategy.create_agents(conversation_summary, self.llm_config)
 
         # 4) Create the group chat and its manager, then start the group chat
-        
+        logging.info(f"[agentic_orchestrator] {self.short_id} creating group chat.")              
         groupchat = autogen.GroupChat(
             agents=agents, 
             messages=[],
             allow_repeat_speaker=False,
             max_round=self.max_rounds
         )
-        
+
+        logging.info(f"[agentic_orchestrator] {self.short_id} creating group chat manager.")          
         manager = autogen.GroupChatManager(
             groupchat=groupchat, 
             llm_config=self.llm_config
@@ -109,7 +111,8 @@ class Orchestrator():
         # Use warnings library to catch autogen UserWarning
         with warnings.catch_warnings(record=True) as w:
 
-            # 5) Initiate group chat      
+            # 5) Initiate group chat
+            logging.info(f"[agentic_orchestrator] {self.short_id} initiating chat.")                
             chat_result = agents[0].initiate_chat(
                 manager, 
                 message=ask,
@@ -121,6 +124,7 @@ class Orchestrator():
             sys.stdout = sys.__stdout__
 
             # 6) Generate answer dictionary containing the conversation ID, the actual answer, sources (data points) and the thought process.
+            logging.info(f"[agentic_orchestrator] {self.short_id} generating answer dictionary.")                     
             answer_dict = {
                 "conversation_id": self.conversation_id,
                 "answer": "",
@@ -138,6 +142,7 @@ class Orchestrator():
                     answer_dict['answer'] = "The content was blocked due to content filtering."
 
             # 7) Update conversation in db
+            logging.info(f"[agentic_orchestrator] {self.short_id} updating conversation.")                
             history.append({"role": "user", "content": ask})        
             history.append({"role": "assistant", "content": answer_dict['answer']})
             response_time = round(time.time() - start_time, 2)
