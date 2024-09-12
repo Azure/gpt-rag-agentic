@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 import autogen
 import uuid
-import sys
+# import sys
 import io
 import warnings
 
@@ -83,7 +83,7 @@ class Orchestrator():
             conversation_summary = self.aoai.get_completion(prompt)
         else:
             conversation_summary = "The conversation just started."
-        logging.info(f"[agentic_orchestrator] {self.short_id} summary: {conversation_summary[:100]}.")
+        logging.info(f"[agentic_orchestrator] {self.short_id} summary: {conversation_summary[:100]}")
 
         # 3) Create Agents and Register Functions using the selected strategy
         logging.info(f"[agentic_orchestrator] {self.short_id} creating agents using {self.strategy_type} strategy.")        
@@ -105,8 +105,8 @@ class Orchestrator():
         )
         
         # Redirect stdout to capture chat execution output 
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
+        # captured_output = io.StringIO()
+        # sys.stdout = captured_output
 
         # Use warnings library to catch autogen UserWarning
         with warnings.catch_warnings(record=True) as w:
@@ -120,8 +120,8 @@ class Orchestrator():
             )
             
             # print and reset stdout to its default value
-            logging.info(f"[agentic_orchestrator] {self.short_id} group chat thought process: \n{captured_output.getvalue()}.")
-            sys.stdout = sys.__stdout__
+            # logging.info(f"[agentic_orchestrator] {self.short_id} group chat thought process: \n{captured_output.getvalue()}.")
+            # sys.stdout = sys.__stdout__
 
             # 6) Generate answer dictionary containing the conversation ID, the actual answer, sources (data points) and the thought process.
             logging.info(f"[agentic_orchestrator] {self.short_id} generating answer dictionary.")                     
@@ -129,7 +129,7 @@ class Orchestrator():
                 "conversation_id": self.conversation_id,
                 "answer": "",
                 "data_points": "",
-                "thoughts": captured_output.getvalue()
+                "thoughts": "" # captured_output.getvalue()
             }
             if chat_result and chat_result.summary:
                 answer_dict['answer'] = chat_result.summary
