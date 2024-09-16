@@ -5,12 +5,12 @@ from tools import vector_index_retrieve
 
 from .base_agent_creation_strategy import BaseAgentCreationStrategy
 
-class DefaultAgentCreationStrategy(BaseAgentCreationStrategy):
-    def create_agents(self, llm_config, conversation_summary):
+class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
+    def create_agents(self, llm_config, history):
         """
-        Default creation strategy that creates the basic agents and registers functions.
+        Classic RAG creation strategy that creates the basic agents and registers functions.
         """
-
+        
         user_proxy_prompt = self._read_prompt("user_proxy")
         user_proxy = UserProxyAgent(
             name="user", 
@@ -20,7 +20,8 @@ class DefaultAgentCreationStrategy(BaseAgentCreationStrategy):
             is_termination_msg=lambda msg: msg.get("content") is not None and "TERMINATE" in msg["content"]
         )
 
-        assistant_prompt = self._read_prompt("assistant", {"conversation_summary": conversation_summary})
+        conversation_summary = self._summarize_conversation(history)
+        assistant_prompt = self._read_prompt("classic_rag_assistant", {"conversation_summary": conversation_summary})
         assistant = AssistantAgent(
             name="assistant", 
             system_message=assistant_prompt, 
@@ -38,5 +39,3 @@ class DefaultAgentCreationStrategy(BaseAgentCreationStrategy):
         )
 
         return [user_proxy, assistant]
-
-            

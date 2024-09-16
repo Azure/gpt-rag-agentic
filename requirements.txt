@@ -18,6 +18,10 @@ pyautogen==0.3.0
 
 aiohttp==3.10.5
 
+# NL2SQL dependencies
+sqlparse==0.5.1
+pyodbc==5.1.0
+
 # DO NOT include azure-functions-worker in this file
 # The Python Worker is managed by Azure Functions platform
 # Manually managing azure-functions-worker may cause unexpected issues

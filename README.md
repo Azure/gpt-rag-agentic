@@ -1,10 +1,73 @@
 # Enterprise RAG Agentic Orchestrator
 
-This Orchestrator is part of the **Enterprise RAG (GPT-RAG)** Solution Accelerator.
+This Orchestrator is part of the **Enterprise RAG (GPT-RAG)** Solution Accelerator. 
 
 To learn more about the Enterprise RAG, please go to [https://aka.ms/gpt-rag](https://aka.ms/gpt-rag).
 
-### Cloud Deployment
+## How the Agentic Orchestrator Works
+
+The **Enterprise RAG Agentic Orchestrator** utilizes AutoGen's group chat feature to enable multiple agents to collaborate on complex tasks. In this system, agents are created based on the chosen strategy and interact in a chat-like environment to achieve a common goal. Each agent has a distinct role—such as querying databases, retrieving knowledge, or synthesizing information—and they work together in a sequence to provide a comprehensive response.
+
+The orchestrator coordinates these interactions, allowing for multiple rounds of conversation between agents, ensuring tasks are completed efficiently. The group chat feature is highly customizable, and users can define their own strategies and agent behaviors to suit specific business needs.
+
+## Selecting an Agent Strategy
+
+You can select an agent strategy through environment variables. By default, the orchestrator uses the `classic-rag` strategy, which is optimized for retrieving information from a knowledge base. Alternatively, the `nl2sql` strategy can be selected for scenarios where natural language queries are converted into SQL to query a relational database.
+
+To configure the orchestrator to use a specific agent strategy:
+
+1. **Set the environment variable**:  
+   Set `AUTOGEN_ORCHESTRATION_STRATEGY` to the desired strategy name.
+   
+   Example:
+   ```bash
+   export AUTOGEN_ORCHESTRATION_STRATEGY=nl2sql
+   ```
+
+2. **Available Strategies**:
+   - **classic-rag**: Retrieves answers from a knowledge base.
+   - **nl2sql**: Converts user questions into SQL queries to retrieve data from a relational database.
+
+## Customizing or Creating New Strategies
+
+You can extend the orchestrator by creating your own agent creation strategies to meet specific needs. These strategies define how agents are created and interact with each other.
+
+1. **Create a Custom Strategy**:  
+   Subclass `BaseAgentCreationStrategy` and implement the `create_agents` method to define how your agents behave.
+   
+2. **Register the Custom Strategy**:  
+   Register your strategy with the `AgentCreationStrategyFactory` so that it can be selected using the appropriate environment variable.
+
+3. **Modify Prompts**:  
+   Agent behavior is guided by prompts located in the `prompts` folder. These prompts define how agents communicate and perform tasks. You can customize these prompts to adjust the behavior of agents in any strategy. For example, if you're creating a new strategy or modifying an existing one, updating these prompt files allows you to control how agents respond and interact within the orchestrator.
+
+## Configuring the `nl2sql` Strategy
+
+The `nl2sql` strategy enables agents to convert natural language queries into SQL statements to retrieve data from a relational database. 
+
+To configure and use the `nl2sql` strategy in the agent-based orchestrator, follow these two key steps:
+
+1. **Configure the SQL Database Connection**  
+
+   Set up the connection to your SQL Database by ensuring your identity has the `db_datareader` permission and configure the connection by setting the following environment variables:
+   
+```bash
+   export SQL_DATABASE_SERVER=my-database-server
+   export SQL_DATABASE_NAME=my-database-name
+   ```   
+
+> [!NOTE]
+> Assumes SQL Database. Adjust settings for other databases as needed.
+
+The connection to the SQL Database uses ODBC and Azure Entra ID for authentication, supporting managed identities. For more details on configuring these permissions, refer to [this guide](https://learn.microsoft.com/azure/azure-sql/database/azure-sql-python-quickstart).
+
+2. **Updating the Data Dictionary**  
+   
+    The `nl2sql` strategy uses the data dictionary to understand the database structure. Functions `get_all_tables_info` and `get_schema_info` retrieve table and column details, enabling accurate SQL query generation. Ensure your database's data dictionary in `config/data_dictionary.json` is up-to-date for optimal performance.
+
+By following these steps, you can configure and customize the `nl2sql` strategy to handle SQL queries effectively. The flexibility of this strategy also allows for adaptation to other data sources beyond SQL databases.
+
+## Cloud Deployment
 
 To deploy the orchestrator in the cloud for the first time, please follow the deployment instructions provided in the [Enterprise RAG repo](https://github.com/Azure/GPT-RAG?tab=readme-ov-file#getting-started).  
    
@@ -26,40 +89,14 @@ azd env refresh
 azd deploy  
 ```
 
+> [!NOTE] 
 > Note: when running the ```azd env refresh```, use the same environment name, subscription, and region used in the initial provisioning of the infrastructure.
 
-### Running Locally with VS Code  
+## Running Locally with VS Code  
    
 [How can I test the solution locally in VS Code?](docs/LOCAL_DEPLOYMENT.md)
 
-Got it! I’ve noted that the prompt files are in the `prompt` folder. Here's an updated version of the README section, taking this into account:
-
-### Customizing the Orchestrator
-
-The **Enterprise RAG Agentic Orchestrator** is designed to be flexible and extensible, enabling you to customize its behavior by modifying or extending the agent creation strategy. The orchestrator uses a strategy pattern, which allows you to define how agents are created, interact, and function. By default, it uses the `DefaultAgentCreationStrategy`, which is a simple RAG implementation, but you can implement your own strategy to fit your needs.
-
-#### How to Customize the Orchestrator
-
-1. **Change the Agent Creation Strategy**:
-   The `AgentCreationStrategyFactory` is responsible for selecting the strategy used to create agents. You can customize the orchestrator by creating your own agent creation strategy and registering it with the factory. To do this, subclass the `BaseAgentCreationStrategy` and implement the `create_agents` method. This method defines how agents are set up. Once your custom strategy is defined, pass its name as the `strategy_type` parameter when initializing the orchestrator.
-
-   Example:
-   ```python
-   orchestrator = Orchestrator(conversation_id, client_principal, strategy_type='custom')
-   ```
-
-2. **Add or Modify Agents**:
-   The default strategy creates two agents (a `UserProxyAgent` and an `AssistantAgent`). To add new agents or modify existing ones, you can customize the `create_agents` method in your strategy. Each agent uses a prompt file stored in the `prompts` folder, which you can modify to change the agent’s behavior. For example, you can add agents with different roles or knowledge domains.
-
-3. **Customize Prompts**:
-   The behavior of each agent is driven by prompts that are stored in the `prompts` folder. You can modify these prompt files to adjust how agents respond to user queries. To add new agents with their own unique behavior, create corresponding prompt files and ensure they are loaded within your custom strategy.
-
-4. **Register Custom Functions**:
-   If you need agents to perform additional tasks, such as integrating with external systems or performing complex data retrieval, you can register custom functions. In the default strategy, a function like `vector_index_retrieve` is registered to allow the assistant to search a knowledge base. You can add more functions in a similar way by modifying the strategy or registering new tools directly with your agents.
-
-By customizing these components, you can tailor the orchestrator to suit specific workflows or business logic, adding more agents or modifying existing ones to handle different scenarios.
-
-### Evaluating
+## Evaluating
 
 [How to test the orchestrator performance?](docs/LOADTEST.md)
 
