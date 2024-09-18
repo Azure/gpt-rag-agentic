@@ -38,6 +38,8 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+__azurite_db_blob__.json
+__azurite_db_blob_extent__.json
 
 # Installer logs
 pip-log.txt
