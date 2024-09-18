@@ -35,42 +35,56 @@ Once the cloud resources (such as CosmosDB and KeyVault) have been provisioned a
 
 Since we're now using managed identities you will have to assign some roles to your user:
 
-1. Azure CosmosDB 'Cosmos DB Built-in Data Contributor' role.
+Here's the rewritten version with one Bash block and one PowerShell block, each containing comments for clarity:
 
-*bash*
-```
-resourceGroupName='your resource group name'
-cosmosDbaccountName='CosmosDB Service name'
-roleDefinitionId='00000000-0000-0000-0000-000000000002'
-principalId='Object id of your user in Microsoft Entra ID'
+### Bash
+```bash
+# Set variables for Cosmos DB role assignment
+resourceGroupName='your resource group name'  # Name of your resource group
+cosmosDbaccountName='CosmosDB Service name'   # Name of your CosmosDB account
+roleDefinitionId='00000000-0000-0000-0000-000000000002'  # Built-in CosmosDB role ID for Data Contributor
+principalId='Object id of your user in Microsoft Entra ID'  # Object ID of the user in Microsoft Entra ID
+
+# Assign CosmosDB Data Contributor role to the user
 az cosmosdb sql role assignment create --account-name $cosmosDbaccountName --resource-group $resourceGroupName --scope "/" --principal-id $principalId --role-definition-id $roleDefinitionId
-```
 
-*PowerShell*
-```
-$resourceGroupName='your resource group name'
-$cosmosDbaccountName='CosmosDB Service name'
-$roleDefinitionId='00000000-0000-0000-0000-000000000002'
-$principalId='Object id of your user in Microsoft Entra ID'
-New-AzCosmosDBSqlRoleAssignment -AccountName $cosmosDbaccountName -ResourceGroupName $resourceGroupName -RoleDefinitionId $roleDefinitionId -Scope "/" -PrincipalId $principalId
-```
+# Set variables for Azure OpenAI role assignment
+subscriptionId='your subscription id'  # Subscription ID
+openAIAccountName='Azure OpenAI service name'  # Name of the Azure OpenAI service
 
-2. Azure OpenAI resource 'Cognitive Services OpenAI User' role.
-
-*bash*
-```
-subscriptionId='your subscription id'
-resourceGroupName='your resource group name'
-openAIAccountName='Azure OpenAI service name'
-principalId='Object id of your user in Microsoft Entra ID'
+# Assign Cognitive Services OpenAI User role
 az role assignment create --role "Cognitive Services OpenAI User" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName
+
+# Set variables for Cognitive Search role assignment
+searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
+
+# Assign Search Index Data Reader role
+az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
 ```
 
-*PowerShell*
-```
-$subscriptionId='your subscription id'
-$resourceGroupName='your resource group name'
-$openAIAccountName='Azure OpenAI service name'
-$principalId='Object id of your user in Microsoft Entra ID'
-New-AzRoleAssignment -ObjectId $principalId -RoleDefinitionName 'Cognitive Services OpenAI User' -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName"
-```
+### PowerShell
+```powershell
+# Set variables for Cosmos DB role assignment
+$resourceGroupName='your resource group name'  # Name of your resource group
+$cosmosDbaccountName='CosmosDB Service name'   # Name of your CosmosDB account
+$roleDefinitionId='00000000-0000-0000-0000-000000000002'  # Built-in CosmosDB role ID for Data Contributor
+$principalId='Object id of your user in Microsoft Entra ID'  # Object ID of the user in Microsoft Entra ID
+
+# Assign CosmosDB Data Contributor role to the user
+az cosmosdb sql role assignment create --account-name $cosmosDbaccountName --resource-group $resourceGroupName --scope "/" --principal-id $principalId --role-definition-id $roleDefinitionId
+
+# Set variables for Azure OpenAI role assignment
+$subscriptionId='your subscription id'  # Subscription ID
+$openAIAccountName='Azure OpenAI service name'  # Name of the Azure OpenAI service
+
+# Assign Cognitive Services OpenAI User role
+az role assignment create --role "Cognitive Services OpenAI User" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName
+
+# Set variables for Cognitive Search role assignment
+$searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
+
+# Assign Search Index Data Reader role
+az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
+``` 
+
+This approach consolidates all commands into respective Bash and PowerShell blocks while adding comments for clarification.
