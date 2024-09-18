@@ -1,0 +1,70 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "LOCAL_ENV": "true",    
+
+    "AZURE_KEY_VAULT_NAME": "[example: kv0-abcd123456789]",
+
+    "AZURE_DB_ID": "[example: dbgpt0-abcd123456789]",
+    "AZURE_DB_NAME": "[example: db0-abcd123456789] ",
+
+    "AZURE_SEARCH_SERVICE": "[example: search0-abcd123456789]",
+    "AZURE_SEARCH_INDEX": "ragindex",
+    "AZURE_SEARCH_API_VERSION": "2024-07-01",
+    "AZURE_SEARCH_APPROACH": "hybrid",
+    "AZURE_SEARCH_USE_SEMANTIC": "false",
+    "AZURE_SEARCH_TOP_K": "3",
+
+    "AZURE_OPENAI_RESOURCE" : "[example: oai0-abcd123456789]",
+    "AZURE_OPENAI_CHATGPT_DEPLOYMENT": "chat",
+    "AZURE_OPENAI_CHATGPT_MODEL": "[example: gpt-35-turbo-16k]",
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "text-embedding-ada-002",
+    "AZURE_OPENAI_EMBEDDING_APIVERSION": "2024-05-01-preview",
+    "AZURE_OPENAI_CHATGPT_MONITORING_DEPLOYMENT": "chat",
+    "AZURE_OPENAI_CHATGPT_LLM_MONITORING": "true",        
+    "AZURE_OPENAI_STREAM" : "false",
+    "AZURE_OPENAI_LOAD_BALANCING": "true",
+
+    "AZURE_OPENAI_TEMPERATURE": "0.1",
+    "AZURE_OPENAI_TOP_P": "0.27",
+    "AZURE_OPENAI_MAX_TOKENS": "1000",
+    "AZURE_OPENAI_APIVERSION":"2024-05-01-preview",
+
+    "BING_SEARCH_TOP_K"="3"
+    "BING_SEARCH_MAX_TOKENS"="1000"
+
+    "ORCHESTRATOR_MESSAGES_LANGUAGE": "en",
+    "CONVERSATION_MAX_HISTORY": "3",
+
+    "BLOCKED_LIST_CHECK" : "true",
+    "GROUNDEDNESS_CHECK" : "true",
+    "RESPONSIBLE_AI_CHECK" : "true",
+    "SECURITY_HUB_CHECK":"false",
+    "SECURITY_HUB_ENDPOINT":"",
+    "CONVERSATION_METADATA" : "true",
+
+    "BING_RETRIEVAL": "false",
+    "SEARCH_RETRIEVAL": "true",
+    "RETRIEVAL_PRIORITY": [choose between "bing" "search" "db"],
+    "DB_RETRIEVAL":"false",
+    "DB_SERVER":"",
+    "DB_DATABASE":"",
+    "DB_USERNAME":"",
+    "DB_TOP_K":"3",
+    "DB_MAX_TOKENS":"1000",
+    "SECURITY_HUB_ENDPOINT": "",
+    "SECURITY_HUB_CHECK": "false",
+    "SECURITY_HUB_HATE_THRESHHOLD": "0",
+    "SECURITY_HUB_SELFHARM_THRESHHOLD": "0",
+    "SECURITY_HUB_SEXUAL_THRESHHOLD": "0",
+    "SECURITY_HUB_VIOLENCE_THRESHHOLD": "0",
+    "SECURITY_HUB_UNGROUNDED_PERCENTAGE_THRESHHOLD":"0.1",
+    "APIM_ENABLED": "false",
+    "APIM_AZURE_OPENAI_ENDPOINT": "",
+    "APIM_BING_CUSTOM_SEARCH_URL": "",
+    "APIM_AZURE_SEARCH_URL": "",
+    "APIM_SECURITY_HUB_ENDPOINT": ""
+  }
+}
