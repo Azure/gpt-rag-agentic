@@ -46,7 +46,9 @@ class Orchestrator:
         conversation, history = await self._get_or_create_conversation()
         agents = self._create_agents_with_strategy(history)
         answer_dict = await self._initiate_group_chat(agents, ask)
-        await self._update_conversation(conversation, ask, answer_dict, time.time() - start_time)
+        response_time = time.time() - start_time
+        await self._update_conversation(conversation, ask, answer_dict, response_time)
+        logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")       
         return answer_dict
     
     async def _get_or_create_conversation(self) -> tuple:
@@ -65,7 +67,38 @@ class Orchestrator:
         return self.agent_creation_strategy.create_agents(self.llm_config, history)
 
     async def _initiate_group_chat(self, agents: list, ask: str) -> dict:
-        """Start the group chat and generate a response."""
+        """
+        Initiates a group chat with multiple agents and generates a response based on the chat interactions.
+        
+        This method creates a group chat instance, manages it using the GroupChatManager, and captures 
+        the chat's execution process, including the agents' thoughts and decisions. It logs various steps 
+        and captures the chat process' output, returning a dictionary with the conversation details, 
+        including the final answer, any data points, and the chat's thought process.
+
+        Args:
+            agents (list): A list of agents participating in the group chat.
+            ask (str): The initial message to start the group chat and guide the conversation.
+
+        Returns:
+            dict: A dictionary containing:
+                - conversation_id (str): A unique identifier for the conversation.
+                - answer (str): The final response generated from the chat.
+                - data_points (str): Any extracted data points from the conversation.
+                - thoughts (str): The captured thought process and output of the agents during the conversation.
+        
+        Logs:
+            Logs various steps of the group chat initiation, including thought processes, warnings, 
+            and potential issues such as content filtering blocks.
+
+        Raises:
+            None: This function does not raise any exceptions, but logs potential issues.
+
+        Notes:
+            - The captured thoughts and stdout redirection allow for insight into the decision-making 
+            process of the agents.
+            - If no valid response is generated or if content filtering occurs, this is handled by 
+            providing an appropriate message in the `answer_dict`.
+        """
         logging.info(f"[orchestrator] {self.short_id} Creating group chat.")
         groupchat = autogen.GroupChat(
             agents=agents, 
@@ -99,12 +132,23 @@ class Orchestrator:
                 "conversation_id": self.conversation_id,
                 "answer": "",
                 "data_points": "",
-                "thoughts": captured_output.getvalue()  # Optional: Capture thought process
+                "thoughts": "Agents group chat:\n\n" + captured_output.getvalue()  # Optional: Capture thought process
             }
             if chat_result and chat_result.summary:
-                answer_dict['answer'] = chat_result.summary
+                # Check if there are at least two messages in the chat history and the second last message is from a tool
                 if len(chat_result.chat_history) >= 2 and chat_result.chat_history[-2]['role'] == 'tool':
+                    # Extract data points from the content of the second last message in the chat history
                     answer_dict['data_points'] = chat_result.chat_history[-2]['content']
+                
+                # Get the summary of the chat result and strip any leading/trailing whitespace
+                chat_answer = chat_result.summary.strip()
+                
+                # If the chat answer ends with a specific marker (e.g., "\n\n****"), remove the marker and strip any trailing whitespace
+                if chat_answer.endswith("\n\n****"):
+                    chat_answer = chat_answer[:-6].strip()
+                
+                # Store the processed chat answer in the answer dictionary
+                answer_dict['answer'] = chat_answer                
             else:
                 logging.info(f"[orchestrator] {self.short_id} No valid response generated.")
                 # Check if there's a warning with content filtering block

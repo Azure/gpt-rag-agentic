@@ -5,10 +5,12 @@ __blobstorage__/
 *$py.class
 local/
 local.settings.json
+__azurite_db_blob__.json
+__azurite_db_blob_extent__.json
 __*/*
-
-
-.vscode*
+*.custom.txt
+.vscode/
+.vscode/*
 
 # C extensions
 *.so
