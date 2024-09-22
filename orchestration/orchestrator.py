@@ -46,7 +46,9 @@ class Orchestrator:
         conversation, history = await self._get_or_create_conversation()
         agents = self._create_agents_with_strategy(history)
         answer_dict = await self._initiate_group_chat(agents, ask)
-        await self._update_conversation(conversation, ask, answer_dict, time.time() - start_time)
+        response_time = time.time() - start_time
+        await self._update_conversation(conversation, ask, answer_dict, response_time)
+        logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")       
         return answer_dict
     
     async def _get_or_create_conversation(self) -> tuple:
