@@ -12,7 +12,13 @@ The orchestrator coordinates these interactions, allowing for multiple rounds of
 
 ## Selecting an Agent Strategy
 
-You can select an agent strategy through environment variables. By default, the orchestrator uses the `classic-rag` strategy, which is optimized for retrieving information from a knowledge base. Alternatively, the `nl2sql` strategy can be selected for scenarios where natural language queries are converted into SQL to query a relational database.
+You can select an agent strategy through environment variables. By default, the orchestrator uses the `classic_rag` strategy, which is optimized for retrieving information from a knowledge base. Alternatively, the `nl2sql` and the experimental `nl2sql_duo` strategies can be selected for scenarios where natural language queries are converted into SQL to query a relational database.
+
+### Available Strategies
+
+- **classic_rag**: Retrieves answers from a knowledge base.
+- **nl2sql**: Converts user questions into SQL queries to retrieve data from a relational database.
+- **nl2sql_duo** *(Experimental)*: Enhances the `nl2sql` strategy by introducing a second agent to review and refine SQL queries and responses for improved accuracy and clarity.
 
 To configure the orchestrator to use a specific agent strategy:
 
@@ -23,10 +29,6 @@ To configure the orchestrator to use a specific agent strategy:
    ```bash
    export AUTOGEN_ORCHESTRATION_STRATEGY=nl2sql
    ```
-
-2. **Available Strategies**:
-   - **classic-rag**: Retrieves answers from a knowledge base.
-   - **nl2sql**: Converts user questions into SQL queries to retrieve data from a relational database.
 
 ## Customizing or Creating New Strategies
 
@@ -41,9 +43,9 @@ You can extend the orchestrator by creating your own agent creation strategies t
 3. **Modify Prompts**:  
    Agent behavior is guided by prompts located in the `prompts` folder. These prompts define how agents communicate and perform tasks. You can customize these prompts to adjust the behavior of agents in any strategy. For example, if you're creating a new strategy or modifying an existing one, updating these prompt files allows you to control how agents respond and interact within the orchestrator.
 
-## Configuring the `nl2sql` Strategy
+## Configuring the `nl2sql` and `nl2sql_duo` Strategies
 
-The `nl2sql` strategy enables agents to convert natural language queries into SQL statements to retrieve data from a relational database. 
+Both the `nl2sql` and `nl2sql_duo` strategies enable agents to convert natural language queries into SQL statements to retrieve data from a relational database. While their configurations are similar, the `nl2sql_duo` strategy introduces an additional agent to enhance query formation and response accuracy.
 
 To configure and use the `nl2sql` strategy in the agent-based orchestrator, follow these two key steps:
 
