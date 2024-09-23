@@ -1,5 +1,6 @@
 import io
 import logging
+import openai
 import os
 import sys
 import time
@@ -31,12 +32,14 @@ class Orchestrator:
         self.model = os.environ.get('AZURE_OPENAI_CHATGPT_DEPLOYMENT', 'openai-chatgpt')
         self.api_version = os.environ.get('AZURE_OPENAI_API_VERSION', '2024-02-01')
         self.max_tokens = int(os.environ.get('AZURE_OPENAI_MAX_TOKENS', 1000))
-        self.orchestration_strategy = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic-rag')
-        self.max_rounds = int(os.environ.get('AUTOGEN_MAX_ROUNDS', 20))
-
+        self.orchestration_strategy = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag')
+        if self.orchestration_strategy == 'classic-rag':
+            self.orchestration_strategy = 'classic_rag'        
+        
         # Agent creation strategy        
         self._setup_llm_config()
         self.agent_creation_strategy = AgentCreationStrategyFactory.get_creation_strategy(self.orchestration_strategy)
+        self.max_rounds = self.agent_creation_strategy.max_rounds
 
     ### Main functions
 
@@ -99,33 +102,34 @@ class Orchestrator:
             - If no valid response is generated or if content filtering occurs, this is handled by 
             providing an appropriate message in the `answer_dict`.
         """
-        logging.info(f"[orchestrator] {self.short_id} Creating group chat.")
-        groupchat = autogen.GroupChat(
-            agents=agents, 
-            messages=[],
-            allow_repeat_speaker=False,
-            max_round=self.max_rounds
-        )
-
-        logging.info(f"[orchestrator] {self.short_id} Creating group chat manager.")
-        manager = autogen.GroupChatManager(
-            groupchat=groupchat, 
-            llm_config=self.llm_config
-        )
-
-        # Redirect stdout to capture chat execution output 
+        # Initialize captured_output and original_stdout before the try block
         captured_output = io.StringIO()
-        sys.stdout = captured_output
+        original_stdout = sys.stdout
 
-        # Use warnings library to catch autogen UserWarning
-        with warnings.catch_warnings(record=True) as w:
+        try:
+            logging.info(f"[orchestrator] {self.short_id} Creating group chat.")
+            groupchat = autogen.GroupChat(
+                agents=agents, 
+                messages=[],
+                allow_repeat_speaker=False,
+                max_round=self.max_rounds
+            )
 
-            logging.info(f"[orchestrator] {self.short_id} Initiating chat.")
-            chat_result = agents[0].initiate_chat(manager, message=ask, summary_method="last_msg")
+            logging.info(f"[orchestrator] {self.short_id} Creating group chat manager.")
+            manager = autogen.GroupChatManager(
+                groupchat=groupchat, 
+                llm_config=self.llm_config
+            )
 
-            # print and reset stdout to its default value
-            logging.info(f"[orchestrator] {self.short_id} Group chat thought process: \n{captured_output.getvalue()}.")
-            sys.stdout = sys.__stdout__
+            # Redirect stdout to capture chat execution output 
+            sys.stdout = captured_output
+
+            # Use warnings library to catch autogen UserWarning
+            with warnings.catch_warnings(record=True) as w:
+                logging.info(f"[orchestrator] {self.short_id} Initiating chat.")
+                chat_result = agents[0].initiate_chat(manager, message=ask, summary_method="last_msg")
+
+                logging.info(f"[orchestrator] {self.short_id} Group chat thought process: \n{captured_output.getvalue()}.")
 
             logging.info(f"[orchestrator] {self.short_id} Generating answer dictionary.")
             answer_dict = {
@@ -134,6 +138,7 @@ class Orchestrator:
                 "data_points": "",
                 "thoughts": "Agents group chat:\n\n" + captured_output.getvalue()  # Optional: Capture thought process
             }
+
             if chat_result and chat_result.summary:
                 # Check if there are at least two messages in the chat history and the second last message is from a tool
                 if len(chat_result.chat_history) >= 2 and chat_result.chat_history[-2]['role'] == 'tool':
@@ -154,8 +159,65 @@ class Orchestrator:
                 # Check if there's a warning with content filtering block
                 if len(w) > 0 and 'finish_reason=\'content_filter\'' in str(w[-1].message):
                     answer_dict['answer'] = "The content was blocked due to content filtering."
+                else:
+                    answer_dict['answer'] = "We had a problem answering your question. Please try again in a few minutes."
 
             return answer_dict
+
+        except AttributeError as ae:
+            # Handle the specific AttributeError related to 'openai.error'
+            captured_stdout = captured_output.getvalue()
+
+            # Reset stdout to its original value
+            sys.stdout = original_stdout
+
+            logging.error(f"[orchestrator] {self.short_id} An AttributeError occurred: {str(ae)}", exc_info=True)
+            logging.error(f"[orchestrator] {self.short_id} Captured stdout before error:\n{captured_stdout}")
+
+            return {
+                "conversation_id": self.conversation_id,
+                "answer": "We encountered an issue processing your request. Please try again later.",
+                "data_points": "",
+                "thoughts": f"An error occurred while processing your request. Captured output before error:\n{captured_stdout}"
+            }
+
+        except openai.OpenAIError as oe:
+            # This block will be reached if 'openai.error.OpenAIError' is replaced with 'openai.OpenAIError'
+            captured_stdout = captured_output.getvalue()
+
+            # Reset stdout to its original value
+            sys.stdout = original_stdout
+
+            logging.error(f"[orchestrator] {self.short_id} An OpenAI error occurred: {str(oe)}", exc_info=True)
+            logging.error(f"[orchestrator] {self.short_id} Captured stdout before error:\n{captured_stdout}")
+
+            return {
+                "conversation_id": self.conversation_id,
+                "answer": "We encountered an issue processing your request. Please try again later.",
+                "data_points": "",
+                "thoughts": f"An error occurred while processing your request. Captured output before error:\n{captured_stdout}"
+            }
+
+        except Exception as e:
+            # Handle all other exceptions
+            captured_stdout = captured_output.getvalue()
+
+            # Reset stdout to its original value
+            sys.stdout = original_stdout
+
+            logging.error(f"[orchestrator] {self.short_id} An unexpected error occurred: {str(e)}", exc_info=True)
+            logging.error(f"[orchestrator] {self.short_id} Captured stdout before error:\n{captured_stdout}")
+
+            return {
+                "conversation_id": self.conversation_id,
+                "answer": "We had a problem answering your question. Please try again in a few minutes.",
+                "data_points": "",
+                "thoughts": f"An unexpected error occurred. Captured output before error:\n{captured_stdout}"
+            }
+
+        finally:
+            # Ensure that stdout is always reset, even if an exception occurs
+            sys.stdout = original_stdout
 
     async def _update_conversation(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):
         """Update conversation in the CosmosDB with the new interaction."""

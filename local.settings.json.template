@@ -27,6 +27,6 @@
     "SQL_DATABASE_SERVER": "[your_sql_database_server].database.windows.net",
     "SQL_DATABASE_NAME": "[your_sql_database_name]",
 
-    "AUTOGEN_ORCHESTRATION_STRATEGY": "classic-rag"
+    "AUTOGEN_ORCHESTRATION_STRATEGY": "classic_rag"
   }
 }

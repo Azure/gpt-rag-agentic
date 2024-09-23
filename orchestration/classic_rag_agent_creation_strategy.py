@@ -4,8 +4,19 @@ from autogen import UserProxyAgent, AssistantAgent, register_function
 from tools import vector_index_retrieve
 
 from .base_agent_creation_strategy import BaseAgentCreationStrategy
+from .constants import CLASSIC_RAG
 
 class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
+
+    def __init__(self):
+        super().__init__()
+        self.strategy_type = CLASSIC_RAG
+
+
+    @property
+    def max_rounds(self):
+        return 10 
+
     def create_agents(self, llm_config, history):
         """
         Classic RAG creation strategy that creates the basic agents and registers functions.
