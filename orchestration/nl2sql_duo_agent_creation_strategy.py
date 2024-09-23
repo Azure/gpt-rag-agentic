@@ -6,7 +6,7 @@ import pyodbc, struct
 from azure.identity import DefaultAzureCredential
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .base_agent_creation_strategy import BaseAgentCreationStrategy
-from .constants import NL2SQL
+from .constants import NL2SQL_DUO
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
 
@@ -31,11 +31,11 @@ class ExecuteSQLResult(BaseModel):
     results: Optional[List[Dict[str, Union[str, int, float, None]]]] = None
     error: Optional[str] = None
 
-class NL2SQLAgentCreationStrategy(BaseAgentCreationStrategy):
+class NL2SQLWithReviewAgentCreationStrategy(BaseAgentCreationStrategy):
 
     def __init__(self):
         super().__init__()
-        self.strategy_type = NL2SQL
+        self.strategy_type = NL2SQL_DUO
 
         # Load the data dictionary JSON file
         data_dictionary_path = 'config/data_dictionary.json'
@@ -49,11 +49,11 @@ class NL2SQLAgentCreationStrategy(BaseAgentCreationStrategy):
         }
         self.connection = self.create_connection()
         self.cursor = self.connection.cursor()
-
+    
     @property
     def max_rounds(self):
-        return 20         
-    
+        return 30      
+
     def create_connection(self):
 
         server = self.sql_config['server']
@@ -79,6 +79,7 @@ class NL2SQLAgentCreationStrategy(BaseAgentCreationStrategy):
         Creates agents and registers functions for the NL2SQL scenario.
         """
 
+        # Create User Proxy Agent
         user_proxy_prompt = self._read_prompt("user_proxy")
         user_proxy = UserProxyAgent(
             name="user",
@@ -88,11 +89,24 @@ class NL2SQLAgentCreationStrategy(BaseAgentCreationStrategy):
             is_termination_msg=lambda msg: msg.get("content") is not None and "TERMINATE" in msg["content"]
         )
 
+        # Create Assistant Agent
         conversation_summary = self._summarize_conversation(history)
         assistant_prompt = self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
         assistant = AssistantAgent(
             name="assistant",
+            description="Interpret user request, generate and validate SQL, execute, and deliver clear results",
             system_message=assistant_prompt,
+            human_input_mode="NEVER",
+            llm_config=llm_config,
+            is_termination_msg=lambda msg: msg.get("content") is not None and "TERMINATE" in msg["content"]            
+        )
+
+        # Create Reviewer Agent
+        reviewer_prompt = self._read_prompt("reviewer")
+        reviewer = AssistantAgent(
+            name="reviewer",
+            description="Ensure SQL queries and responses are accurate, efficient, and relevant, approving or suggesting improvements.",
+            system_message=reviewer_prompt,
             human_input_mode="NEVER",
             llm_config=llm_config
         )
@@ -207,4 +221,4 @@ class NL2SQLAgentCreationStrategy(BaseAgentCreationStrategy):
             description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row."
         )
 
-        return [user_proxy, assistant]
+        return [user_proxy, assistant, reviewer]
