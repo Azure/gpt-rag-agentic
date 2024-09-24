@@ -31,7 +31,7 @@ class ExecuteSQLResult(BaseModel):
     results: Optional[List[Dict[str, Union[str, int, float, None]]]] = None
     error: Optional[str] = None
 
-class NL2SQLWithReviewAgentCreationStrategy(BaseAgentCreationStrategy):
+class NL2SQLDuoAgentCreationStrategy(BaseAgentCreationStrategy):
 
     def __init__(self):
         super().__init__()
