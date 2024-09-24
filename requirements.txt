@@ -15,8 +15,8 @@ openai==1.42.0
 
 # GenAI dependencies
 flaml==2.2.0
-# autogen==0.3.0
-pyautogen==0.2.33
+autogen==0.3.0
+# pyautogen==0.2.33
 
 aiohttp==3.10.5
 
