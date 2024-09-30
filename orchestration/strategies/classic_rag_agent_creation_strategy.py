@@ -4,7 +4,7 @@ from autogen import UserProxyAgent, AssistantAgent, register_function
 from tools import vector_index_retrieve
 
 from .base_agent_creation_strategy import BaseAgentCreationStrategy
-from .constants import CLASSIC_RAG
+from ..constants import CLASSIC_RAG
 
 class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
 
@@ -16,6 +16,11 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
     @property
     def max_rounds(self):
         return 10 
+    
+    @property
+    def send_introductions(self):
+        return False
+    
 
     def create_agents(self, llm_config, history):
         """
