@@ -18,7 +18,10 @@ You can select an agent strategy through environment variables. By default, the 
 
 - **classic_rag**: Retrieves answers from a knowledge base.
 - **nl2sql**: Converts user questions into SQL queries to retrieve data from a relational database.
-- **nl2sql_dual** *(Experimental)*: Enhances the `nl2sql` strategy by introducing a second agent to review and refine SQL queries and responses for improved accuracy and clarity.
+
+#### Experimental Strategies
+- **nl2sql_dual**: Introduces a second agent to review and refine SQL queries and responses for improved accuracy and clarity.
+- **nl2sql_fewshot**: A variation of the single-agent approach that uses AI search to find similar queries, improving SQL generation accuracy.
 
 To configure the orchestrator to use a specific agent strategy:
 
@@ -43,29 +46,43 @@ You can extend the orchestrator by creating your own agent creation strategies t
 3. **Modify Prompts**:  
    Agent behavior is guided by prompts located in the `prompts` folder. These prompts define how agents communicate and perform tasks. You can customize these prompts to adjust the behavior of agents in any strategy. For example, if you're creating a new strategy or modifying an existing one, updating these prompt files allows you to control how agents respond and interact within the orchestrator.
 
-## Configuring the `nl2sql` and `nl2sql_dual` Strategies
+## Configuring the `nl2sql` Strategies
 
-Both the `nl2sql` and `nl2sql_dual` strategies enable agents to convert natural language queries into SQL statements to retrieve data from a relational database. While their configurations are similar, the `nl2sql_dual` strategy introduces an additional agent to enhance query formation and response accuracy.
+The `nl2sql`, `nl2sql_dual`, and `nl2sql_fewshot` strategies enable agents to convert natural language queries into SQL statements to retrieve data from a relational database. While their configurations are similar, the `nl2sql_dual` strategy introduces an additional agent to enhance query formation and response accuracy. The `nl2sql_fewshot` strategy, on the other hand, is based on a single agent but brings similar query examples into the conversation.
 
 To configure and use the `nl2sql` strategy in the agent-based orchestrator, follow these two key steps:
 
-1. **Configure the SQL Database Connection**  
+1. **Configure the SQL Database Connection**
 
-   Set up the connection to your SQL Database by ensuring your identity has the `db_datareader` permission and configure the connection by setting the following environment variables:
+   To set up the connection to your SQL Database, ensure your identity has `db_datareader` permissions. Configure the connection using the following environment variables either in the Function App settings or as local environment variables for testing purposes:
    
-```bash
-   export SQL_DATABASE_SERVER=my-database-server
-   export SQL_DATABASE_NAME=my-database-name
-   ```   
+   ```bash
+   SQL_DATABASE_SERVER=my-database-server
+   SQL_DATABASE_NAME=my-database-name
+   SQL_DATABASE_TYPE=[sqldatabase or fabric]
+   ```
 
-> [!NOTE]
-> Assumes SQL Database. Adjust settings for other databases as needed.
+   - **For SQL Database**: Use `SQL_DATABASE_SERVER` as your database server name and `SQL_DATABASE_NAME` as your database name.
+   
+   - **For Fabric SQL Endpoint**: Use `SQL_DATABASE_SERVER` as the full SQL connection string and `SQL_DATABASE_NAME` as the name of the Lakehouse or Warehouse you want to connect to.
 
-The connection to the SQL Database uses ODBC and Azure Entra ID for authentication, supporting managed identities. For more details on configuring these permissions, refer to [this guide](https://learn.microsoft.com/azure/azure-sql/database/azure-sql-python-quickstart).
+   The connection to the SQL Database uses ODBC and Azure Entra ID for authentication, supporting managed identities. For more information on configuring SQL Database permissions, refer to [this guide](https://learn.microsoft.com/azure/azure-sql/database/azure-sql-python-quickstart).
+
+   > **Note:**  
+   > Both SQL Database and Fabric SQL Endpoints are supported. If you are working with other database types, you may need to adjust the [SQLDBClient](connectors/sqldbs.py) accordingly.
 
 2. **Updating the Data Dictionary**  
    
     The `nl2sql` strategy uses the data dictionary to understand the database structure. Functions `get_all_tables_info` and `get_schema_info` retrieve table and column details, enabling accurate SQL query generation. Ensure your database's data dictionary in `config/data_dictionary.json` is up-to-date for optimal performance.
+
+3. **NL2SQL Few-Shot Strategy configuration**
+
+    The `nl2sql` few-shot strategy utilizes pre-defined query examples to improve the accuracy of the generated SQL queries. These examples are stored in files with the `.nl2sql` extension, such as [queries.nl2sql](config/queries.nl2sql). The query examples are essential for enabling the model to generate contextually relevant SQL based on the database structure and queries.
+
+    To ensure optimal retrieval of these examples during query generation, you need to ingest the `.nl2sql` files into an AI Search Index using the [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) component. This ensures that the query examples are efficiently indexed and retrieved in real time, enhancing the performance of the `nl2sql` strategy.
+
+    > **Note:** Ensure that the examples in `.nl2sql` files are clear and contextually relevant to your database queries to maximize the model's performance in the `nl2sql` strategy.
+
 
 By following these steps, you can configure and customize the `nl2sql` strategy to handle SQL queries effectively. The flexibility of this strategy also allows for adaptation to other data sources beyond SQL databases.
 
