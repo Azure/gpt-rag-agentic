@@ -40,6 +40,7 @@ class Orchestrator:
         self._setup_llm_config()
         self.agent_creation_strategy = AgentCreationStrategyFactory.get_creation_strategy(self.orchestration_strategy)
         self.max_rounds = self.agent_creation_strategy.max_rounds
+        self.send_introductions=self.agent_creation_strategy.send_introductions
 
     ### Main functions
 
@@ -66,7 +67,7 @@ class Orchestrator:
     
     def _create_agents_with_strategy(self, history: str) -> list:
         """Create agents based on the selected strategy."""
-        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_creation_strategy} strategy.")
+        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_creation_strategy.strategy_type} strategy.")
         return self.agent_creation_strategy.create_agents(self.llm_config, history)
 
     async def _initiate_group_chat(self, agents: list, ask: str) -> dict:
@@ -112,7 +113,8 @@ class Orchestrator:
                 agents=agents, 
                 messages=[],
                 allow_repeat_speaker=False,
-                max_round=self.max_rounds
+                max_round=self.max_rounds,
+                send_introductions=self.send_introductions
             )
 
             logging.info(f"[orchestrator] {self.short_id} Creating group chat manager.")

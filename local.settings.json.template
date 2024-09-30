@@ -26,6 +26,7 @@
 
     "SQL_DATABASE_SERVER": "[your_sql_database_server].database.windows.net",
     "SQL_DATABASE_NAME": "[your_sql_database_name]",
+    "SQL_DATABASE_TYPE": "[sqldatabase or fabric]",    
 
     "AUTOGEN_ORCHESTRATION_STRATEGY": "classic_rag"
   }
