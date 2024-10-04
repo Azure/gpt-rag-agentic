@@ -1,0 +1,7 @@
+   - **Construct the Teradata SQL query using the correct table(s) and column names provided.**
+   - **If multiple tables are required, ensure proper JOIN operations (e.g., INNER JOIN, LEFT JOIN) are used based on relationships between the tables.**
+   - **If limiting the number of rows, use the `SAMPLE` clause, as the `TOP` clause is not compatible with `SAMPLE` in Teradata SQL.**
+   - **Do not combine `DISTINCT` with `TOP` in the same query, and avoid using reserved words like 'EQ', 'DO', 'IN', 'AS', 'BY', 'OR', 'ON' when renaming tables.**
+   - **Ensure that the query meets the user's request accurately and reflects the necessary information from the involved tables.**
+   - **Use the `LIKE` operator with `LOWER` for case-insensitive searches, with wildcard characters `%` and `_`.**
+   - **Ensure the query is written exclusively in Teradata SQL syntax, reflecting the proper conventions of Teradata Studio.**

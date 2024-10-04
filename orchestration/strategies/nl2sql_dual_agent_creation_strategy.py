@@ -6,7 +6,6 @@ from azure.identity import DefaultAzureCredential
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
 from ..constants import NL2SQL_DUAL
-from connectors.sqldbs import SQLDBClient
 from typing import Optional, List, Dict, Union
 from .nl2sql_base_agent_creation_strategy import (
     NL2SQLBaseAgentCreationStrategy,
@@ -21,11 +20,6 @@ class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
     def __init__(self):
         self.strategy_type = NL2SQL_DUAL
         super().__init__()
-
-    def create_connection(self):
-        connector = SQLDBClient(self.sql_config)
-        connection = connector.create_connection()
-        return connection
 
     @property
     def max_rounds(self):

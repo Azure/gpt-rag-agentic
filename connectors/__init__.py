@@ -2,3 +2,4 @@
 from .aoai import AzureOpenAIClient
 from .cosmosdb import CosmosDBClient
 from .sqldbs import SQLDBClient
+from .keyvault import get_secret

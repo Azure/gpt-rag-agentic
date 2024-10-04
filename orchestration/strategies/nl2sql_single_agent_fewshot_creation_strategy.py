@@ -3,7 +3,6 @@ import os
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
 from ..constants import NL2SQL_FEWSHOT
-from connectors.sqldbs import SQLDBClient
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
 from tools import vector_index_retrieve
@@ -20,11 +19,6 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
     def __init__(self):
         self.strategy_type = NL2SQL_FEWSHOT
         super().__init__()
-
-    def create_connection(self):
-        connector = SQLDBClient(self.sql_config)
-        connection = connector.create_connection()
-        return connection
 
     @property
     def max_rounds(self):

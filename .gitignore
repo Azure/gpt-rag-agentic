@@ -10,6 +10,7 @@ __azurite_db_blob_extent__.json
 __*/*
 *.custom.txt
 *.custom.json
+*.bkp
 
 .vscode/*
 
