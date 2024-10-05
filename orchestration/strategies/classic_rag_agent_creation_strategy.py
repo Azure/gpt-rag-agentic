@@ -1,7 +1,7 @@
 import logging
 
 from autogen import UserProxyAgent, AssistantAgent, register_function
-from tools import vector_index_retrieve
+from tools import vector_index_retrieve, get_today_date, get_time
 
 from .base_agent_creation_strategy import BaseAgentCreationStrategy
 from ..constants import CLASSIC_RAG
@@ -54,4 +54,21 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
             description="Search the knowledge base for sources to ground and give context to answer a user question. Return sources.", 
         )
 
+        # Register the date function
+        register_function(
+            get_today_date,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_today_date",
+            description="Provides today's date in the format YYYY-MM-DD."
+        )
+
+        # Register the current hour and minutes function
+        register_function(
+            get_time,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_time",
+            description="Provides the current time in the format HH:MM."
+        )
         return [user_proxy, assistant]
