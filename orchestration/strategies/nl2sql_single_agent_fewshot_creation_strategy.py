@@ -13,6 +13,7 @@ from .nl2sql_base_agent_creation_strategy import (
     ValidateSQLResult,
     ExecuteSQLResult
 )
+from tools import get_today_date, get_time
 
 class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
 
@@ -98,7 +99,6 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row."
         )
 
-        # Register functions
         register_function(
             vector_index_retrieve,
             caller=assistant,
@@ -107,5 +107,19 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Search for similar queries before the assistant generate a new query. Return sources.", 
         )
 
+        register_function(
+            get_today_date,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_today_date",
+            description="Provides today's date in the format YYYY-MM-DD."
+        )
 
+        register_function(
+            get_time,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_time",
+            description="Provides the current time in the format HH:MM."
+        )
         return [user_proxy, assistant]
