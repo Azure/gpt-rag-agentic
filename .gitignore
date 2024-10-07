@@ -11,8 +11,14 @@ __*/*
 *.custom.txt
 *.custom.json
 *.bkp
-
+*.xlsx
+*.custom.*
 .vscode/*
+
+# Evaluations
+qa_flow_quality_eval.json
+responses.json
+prompty-answer-score-eval.xlsx
 
 # C extensions
 *.so

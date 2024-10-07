@@ -1,5 +1,6 @@
 import logging
 import os
+import re 
 
 from connectors import AzureOpenAIClient
 
@@ -36,6 +37,10 @@ class BaseAgentCreationStrategy:
         - If `placeholders` are provided, any placeholder in the prompt following 
         the format `{{placeholder_name}}` will be replaced with the corresponding 
         value from `placeholders`.
+        - For any remaining placeholders not replaced (i.e., not in `placeholders`), 
+        the method will search for a file named `placeholder_name.txt` in the 
+        `prompts/common` directory. If the file exists, the placeholder will be replaced 
+        with the content of that file.
 
         **Examples**:
         For an agent named `agent1` and a strategy type `customer_service`, the 
@@ -57,7 +62,7 @@ class BaseAgentCreationStrategy:
         # Define the custom and default file paths
         custom_file_path = os.path.join(self._prompt_dir(), f"{agent_name}.custom.txt")
         default_file_path = os.path.join(self._prompt_dir(), f"{agent_name}.txt")
-                             
+                                 
         # Check for the custom prompt file first
         if os.path.exists(custom_file_path):
             selected_file = custom_file_path
@@ -72,9 +77,32 @@ class BaseAgentCreationStrategy:
         # Read and process the selected prompt file
         with open(selected_file, "r") as f:
             prompt = f.read().strip()
+            
+            # Replace placeholders provided in the 'placeholders' dictionary
             if placeholders:
                 for key, value in placeholders.items():
                     prompt = prompt.replace(f"{{{{{key}}}}}", value)
+            
+            # Find any remaining placeholders in the prompt
+            pattern = r"\{\{([^}]+)\}\}"
+            matches = re.findall(pattern, prompt)
+            
+            # Process each unmatched placeholder
+            for placeholder_name in set(matches):
+                # Skip if placeholder was already replaced
+                if placeholders and placeholder_name in placeholders:
+                    continue
+                # Look for a corresponding file in 'prompts/common'
+                common_file_path = os.path.join("prompts", "common", f"{placeholder_name}.txt")
+                if os.path.exists(common_file_path):
+                    with open(common_file_path, "r") as pf:
+                        placeholder_content = pf.read().strip()
+                        prompt = prompt.replace(f"{{{{{placeholder_name}}}}}", placeholder_content)
+                else:
+                    # Log a warning if the placeholder cannot be replaced
+                    logging.warning(
+                        f"[base_agent_creation_strategy] Placeholder '{{{{{placeholder_name}}}}}' could not be replaced."
+                    )
             return prompt
 
     def _prompt_dir(self):

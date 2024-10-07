@@ -45,8 +45,69 @@ You can extend the orchestrator by creating your own agent creation strategies t
 2. **Register the Custom Strategy**:  
    Register your strategy with the `AgentCreationStrategyFactory` so that it can be selected using the appropriate environment variable.
 
-3. **Modify Prompts**:  
-   Agent behavior is guided by prompts located in the `prompts` folder. These prompts define how agents communicate and perform tasks. You can customize these prompts to adjust the behavior of agents in any strategy. For example, if you're creating a new strategy or modifying an existing one, updating these prompt files allows you to control how agents respond and interact within the orchestrator.
+## Modifying Prompts
+
+Agent behavior is guided by prompt files located in the `prompts` directory. These prompts define how agents communicate and perform tasks. You can customize these prompts to adjust the behavior of agents in any strategy.
+
+### Prompt File Structure
+
+- **Base Directory**: `prompts/`
+- **Strategy Subdirectory**: If your strategy has a `strategy_type`, prompts are located in `prompts/{strategy_type}/`.
+- **Prompt Files**:
+  - **Default Prompt File**: `{agent_name}.txt`
+  - **Custom Prompt File**: `{agent_name}.custom.txt`
+
+### Using Custom Prompt Files
+
+To customize an agent's prompt without altering the default prompt file, you can create a custom prompt file:
+
+1. **Create a Custom Prompt File**:
+   - Name your custom prompt file as `{agent_name}.custom.txt`.
+   - Place it in the appropriate prompts directory (e.g., `prompts/{strategy_type}/`).
+
+2. **Prompt File Lookup Order**:
+   - The orchestrator will first look for `{agent_name}.custom.txt`.
+   - If not found, it will fall back to `{agent_name}.txt`.
+   - If neither file is found, an error will be raised.
+
+### Using Placeholders in Prompts
+
+Prompts can contain placeholders that will be dynamically replaced at runtime. Placeholders follow the format `{{placeholder_name}}`.
+
+#### Placeholder Replacement Process
+
+1. **Provided Placeholders**:
+   - When reading the prompt, you can supply a `placeholders` dictionary where keys are placeholder names and values are their replacements.
+   - Any placeholders matching the keys in this dictionary will be replaced with their corresponding values.
+
+2. **Common Placeholder Files**:
+   - For any remaining placeholders not replaced by the provided `placeholders` dictionary, the orchestrator will search for files named `{placeholder_name}.txt` in the `prompts/common/` directory.
+   - If such a file exists, the placeholder will be replaced with the content of that file.
+
+3. **Unmatched Placeholders**:
+   - If a placeholder cannot be replaced (i.e., no provided value and no matching file), a warning will be logged, and the placeholder will remain in the prompt.
+
+#### Example
+
+Suppose you have a prompt for an agent named `assistant` with the following content:
+
+```
+{{greeting}}
+
+I am here to assist you with your tasks.
+
+{{closing}}
+```
+
+- **Using Provided Placeholders**:
+  - If you supply a `placeholders` dictionary like `{'greeting': 'Hello there!', 'closing': 'Best regards.'}`, the placeholders `{{greeting}}` and `{{closing}}` will be replaced accordingly.
+
+- **Using Common Placeholder Files**:
+  - If you do not provide values for `{{greeting}}` and `{{closing}}`, the orchestrator will look for `prompts/common/greeting.txt` and `prompts/common/closing.txt`.
+  - If these files exist and contain text, the placeholders will be replaced with that content.
+
+- **Unmatched Placeholders**:
+  - If neither the `placeholders` dictionary provides values nor the common files exist, the placeholders will remain in the prompt, and a warning will be logged.
 
 ## Configuring the `nl2sql` Strategies
 
@@ -146,7 +207,9 @@ azd deploy
 
 ## Evaluating
 
-[How to test the orchestrator performance?](docs/LOADTEST.md)
+To assess the performance of the Orchestrator, we have provided an evaluation program that allows you to test and measure its capabilities.
+
+For detailed instructions on how to run the evaluation program, set up the environment, and prepare test data, please refer to the [Evaluation Documentation](docs/EVALUATION.md).
 
 ## Contributing
 

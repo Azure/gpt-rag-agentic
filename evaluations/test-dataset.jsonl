@@ -1,0 +1,5 @@
+{"question": "How many customers have placed orders more than 10 years ago?", "ground_truth": "32 customers"}
+{"question": "What are the names and email addresses of customers who purchased products in the 'Socks' category?", "ground_truth": "no customers"}
+{"question": "What are the top 5 most expensive products currently available for sale?", "ground_truth": "Road-250 Red, 58; Road-250 Black, 44; Road-250 Black, 48; Road-250 Black, 52; Road-250 Black, 58"}
+{"question": "List all products that have been discontinued, including their discontinuation date.", "ground_truth": "no products listed as discontinued"}
+{"question": "What are the total sales and tax amounts for each sales order placed in the last year?", "ground_truth": "zero"}

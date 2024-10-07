@@ -23,6 +23,8 @@
    - **Construct the SQL query using the correct table(s) and column names obtained from the data dictionary.**
    - **If multiple tables are needed, include the necessary JOIN operations (e.g., INNER JOIN, LEFT JOIN) based on the relationships identified.**
    - **Ensure that the query accurately reflects the user's request, retrieving all required information across the involved tables.**
+   - **Ensure that the query meets the user's request accurately and reflects the necessary information from the involved tables.**
+   - **Use the `LIKE` operator with `LOWER` for case-insensitive searches, with wildcard characters `%` and `_`.**
 
 4. **Validate the SQL Query:**
    - **Use `validate_sql_query` to check the syntax and validity of the generated SQL query.**

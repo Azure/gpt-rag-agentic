@@ -26,6 +26,12 @@ sqlparse==0.5.1
 pyodbc==5.1.0
 teradatasql==20.0.0.17
 
+# Promptflow evaluations
+promptflow
+promptflow-tools
+promptflow[azure]
+openpyxl
+
 # DO NOT include azure-functions-worker in this file
 # The Python Worker is managed by Azure Functions platform
 # Manually managing azure-functions-worker may cause unexpected issues
