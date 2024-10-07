@@ -6,7 +6,6 @@ from azure.identity import DefaultAzureCredential
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
 from ..constants import NL2SQL_DUAL
-from connectors.sqldbs import SQLDBClient
 from typing import Optional, List, Dict, Union
 from .nl2sql_base_agent_creation_strategy import (
     NL2SQLBaseAgentCreationStrategy,
@@ -15,17 +14,13 @@ from .nl2sql_base_agent_creation_strategy import (
     ValidateSQLResult,
     ExecuteSQLResult
 )
+from tools import get_today_date, get_time
 
 class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
 
     def __init__(self):
         self.strategy_type = NL2SQL_DUAL
         super().__init__()
-
-    def create_connection(self):
-        connector = SQLDBClient(self.sql_config)
-        connection = connector.create_connection()
-        return connection
 
     @property
     def max_rounds(self):
@@ -66,7 +61,7 @@ class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
         advisor_prompt = self._read_prompt("advisor")
         advisor = AssistantAgent(
             name="advisor",
-            description="Reviews SQL queries after the assistant prepares them, always providing feedback before execution.",
+            description="Reviews and rewrites SQL queries as needed for optimal execution.",
             system_message=advisor_prompt,
             human_input_mode="NEVER",
             llm_config=llm_config
@@ -117,4 +112,19 @@ class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Validate the syntax of an SQL query. Returns is_valid as True if valid, or is_valid as False with an error message if invalid."
         )
 
+        register_function(
+            get_today_date,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_today_date",
+            description="Provides today's date in the format YYYY-MM-DD."
+        )
+
+        register_function(
+            get_time,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_time",
+            description="Provides the current time in the format HH:MM."
+        )
         return [user_proxy, assistant, advisor]

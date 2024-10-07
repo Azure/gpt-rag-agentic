@@ -3,6 +3,7 @@ import json
 import os
 import sqlparse
 from abc import ABC, abstractmethod
+from connectors.sqldbs import SQLDBClient
 from .base_agent_creation_strategy import BaseAgentCreationStrategy
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
@@ -52,16 +53,14 @@ class NL2SQLBaseAgentCreationStrategy(BaseAgentCreationStrategy, ABC):
             self.data_dictionary = json.load(f)
 
         # Initialize the database connection
-        self.sql_config = {
-            'server': os.environ.get('SQL_DATABASE_SERVER', 'replace_with_database_server_name'),
-            'database': os.environ.get('SQL_DATABASE_NAME', 'replace_with_database_name')
-        }
         self.connection = self.create_connection()
         self.cursor = self.connection.cursor()
 
-    @abstractmethod
+
     def create_connection(self):
-        pass
+        connector = SQLDBClient()
+        connection = connector.create_connection()
+        return connection
 
     @property
     @abstractmethod

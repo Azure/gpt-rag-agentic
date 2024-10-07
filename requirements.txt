@@ -3,6 +3,7 @@ azure-functions
 azurefunctions-extensions-bindings-blob
 
 # Azure SDK dependencies
+azure-keyvault-secrets==4.8.0
 azure-cosmos==4.5.1
 azure-identity
 azure-mgmt-web
@@ -23,6 +24,13 @@ aiohttp==3.10.5
 # NL2SQL dependencies
 sqlparse==0.5.1
 pyodbc==5.1.0
+teradatasql==20.0.0.17
+
+# Promptflow evaluations
+promptflow
+promptflow-tools
+promptflow[azure]
+openpyxl
 
 # DO NOT include azure-functions-worker in this file
 # The Python Worker is managed by Azure Functions platform

@@ -3,7 +3,6 @@ import os
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
 from ..constants import NL2SQL_FEWSHOT
-from connectors.sqldbs import SQLDBClient
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
 from tools import vector_index_retrieve
@@ -14,17 +13,13 @@ from .nl2sql_base_agent_creation_strategy import (
     ValidateSQLResult,
     ExecuteSQLResult
 )
+from tools import get_today_date, get_time
 
 class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
 
     def __init__(self):
         self.strategy_type = NL2SQL_FEWSHOT
         super().__init__()
-
-    def create_connection(self):
-        connector = SQLDBClient(self.sql_config)
-        connection = connector.create_connection()
-        return connection
 
     @property
     def max_rounds(self):
@@ -104,7 +99,6 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row."
         )
 
-        # Register functions
         register_function(
             vector_index_retrieve,
             caller=assistant,
@@ -113,5 +107,19 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Search for similar queries before the assistant generate a new query. Return sources.", 
         )
 
+        register_function(
+            get_today_date,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_today_date",
+            description="Provides today's date in the format YYYY-MM-DD."
+        )
 
+        register_function(
+            get_time,
+            caller=assistant,
+            executor=user_proxy,
+            name="get_time",
+            description="Provides the current time in the format HH:MM."
+        )
         return [user_proxy, assistant]
