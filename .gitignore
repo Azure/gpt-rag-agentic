@@ -16,8 +16,8 @@ __*/*
 .vscode/*
 
 # Evaluations
-qa_flow_quality_eval.json
-responses.json
+qa_flow_quality_eval.jsonl
+responses.jsonl
 prompty-answer-score-eval.xlsx
 
 # C extensions
