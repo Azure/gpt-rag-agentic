@@ -125,11 +125,13 @@ class BaseAgentCreationStrategy:
         if history:
             aoai = AzureOpenAIClient()
             prompt = (
-                "Summarize the conversation provided, identify its main points of discussion "
-                f"and any conclusions that were reached. Conversation history: \n{history}"
+                "Please summarize the following conversation, highlighting the main topics discussed, the specific subject "
+                "if mentioned, any decisions made, questions raised, and any unresolved issues or actions pending. "
+                "If there is a document or object mentioned with an identifying number, include that information for future reference. "
+                f"Conversation history: \n{history}"
             )
             conversation_summary = aoai.get_completion(prompt)
         else:
             conversation_summary = "The conversation just started."
-        logging.info(f"[base_agent_creation_strategy] Conversation summary: {conversation_summary[:100]}")
+        logging.info(f"[base_agent_creation_strategy] Conversation summary: {conversation_summary[:200]}")
         return conversation_summary

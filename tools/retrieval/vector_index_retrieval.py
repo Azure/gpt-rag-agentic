@@ -7,7 +7,7 @@ import logging
 import requests
 
 def vector_index_retrieve(
-    input: Annotated[str, "The user question"]
+    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
 ) -> Annotated[str, "The output is a string with the search results"]:
     aoai = AzureOpenAIClient()
 
