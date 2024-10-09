@@ -25,8 +25,16 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
     def create_agents(self, llm_config, history):
         """
         Classic RAG creation strategy that creates the basic agents and registers functions.
-        """
         
+        Parameters:
+        - llm_config: Configuration for the large language model (LLM) used by the assistant agents.
+        - history: The conversation history, which will be summarized to provide context for the assistant's responses.
+        
+        Returns:
+        - agent_configuration: A dictionary that includes the list of agents and the allowed transitions between them.
+        """
+
+        # Create UserProxyAgent with a system message and termination condition
         user_proxy_prompt = self._read_prompt("user_proxy")
         user_proxy = UserProxyAgent(
             name="user", 
@@ -36,11 +44,21 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
             is_termination_msg=lambda msg: msg.get("content") is not None and "TERMINATE" in msg["content"]
         )
 
+        # Summarize conversation history and create AssistantAgent
         conversation_summary = self._summarize_conversation(history)
         assistant_prompt = self._read_prompt("classic_rag_assistant", {"conversation_summary": conversation_summary})
         assistant = AssistantAgent(
             name="assistant", 
             system_message=assistant_prompt, 
+            human_input_mode="NEVER",
+            llm_config=llm_config
+        )
+
+        # Create sentinel agent
+        sentinel_prompt = self._read_prompt("sentinel")
+        sentinel = AssistantAgent(
+            name="sentinel", 
+            system_message=sentinel_prompt, 
             human_input_mode="NEVER",
             llm_config=llm_config
         )
@@ -51,24 +69,37 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
             caller=assistant,
             executor=user_proxy,
             name="vector_index_retrieve", 
-            description="Search the knowledge base for sources to ground and give context to answer a user question. Return sources.", 
+            description="Search the knowledge base for sources to ground and give context to answer a user question."
         )
 
-        # Register the date function
         register_function(
             get_today_date,
             caller=assistant,
             executor=user_proxy,
             name="get_today_date",
-            description="Provides today's date in the format YYYY-MM-DD."
+            description="Provides today's date in YYYY-MM-DD format."
         )
 
-        # Register the current hour and minutes function
         register_function(
             get_time,
             caller=assistant,
             executor=user_proxy,
             name="get_time",
-            description="Provides the current time in the format HH:MM."
+            description="Provides the current time in HH:MM format."
         )
-        return [user_proxy, assistant]
+
+        # Define allowed transitions between agents
+        allowed_transitions = {
+            sentinel: [user_proxy],
+            user_proxy: [assistant],
+            assistant: [sentinel, user_proxy],
+        }
+        
+        # Return agent configuration
+        agent_configuration = {
+            "agents": [user_proxy, assistant, sentinel],
+            "transitions": allowed_transitions,
+            "transitions_type": "allowed"
+        }
+
+        return agent_configuration
