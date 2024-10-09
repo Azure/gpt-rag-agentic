@@ -1,5 +1,6 @@
 from promptflow.client import PFClient
 from promptflow.core import AzureOpenAIModelConfiguration
+from dotenv import load_dotenv
 import json
 import os
 import pandas as pd
@@ -9,7 +10,8 @@ import time
 
 def main():
     print("Starting main function...")
-
+    load_dotenv()
+    
     azure_config = {
         "aoai_endpoint": os.environ.get('AZURE_OPENAI_ENDPOINT', ''),
         "aoai_api_version": os.environ.get('AZURE_OPENAI_API_VERSION', '2024-02-01'),

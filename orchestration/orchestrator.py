@@ -48,8 +48,8 @@ class Orchestrator:
         """Process user query and generate a response from agents."""
         start_time = time.time()
         conversation, history = await self._get_or_create_conversation()
-        agents = self._create_agents_with_strategy(history)
-        answer_dict = await self._initiate_group_chat(agents, ask)
+        agent_configuration = self._create_agents_with_strategy(history)
+        answer_dict = await self._initiate_group_chat(agent_configuration, ask)
         response_time = time.time() - start_time
         await self._update_conversation(conversation, ask, answer_dict, response_time)
         logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")       
@@ -70,7 +70,7 @@ class Orchestrator:
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_creation_strategy.strategy_type} strategy.")
         return self.agent_creation_strategy.create_agents(self.llm_config, history)
 
-    async def _initiate_group_chat(self, agents: list, ask: str) -> dict:
+    async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
         """
         Initiates a group chat with multiple agents and generates a response based on the chat interactions.
         
@@ -80,7 +80,11 @@ class Orchestrator:
         including the final answer, any data points, and the chat's thought process.
 
         Args:
-            agents (list): A list of agents participating in the group chat.
+            agent_configuration (dict): A dictionary that configures the group chat, containing:
+                - "agents" (list): A list of agents who will participate in the conversation.
+                - "transitions" (dict): Defines the allowed or disallowed speaker transitions between agents.
+                - "transitions_type" (str): Specifies how transitions are managed, such as allowing or restricting 
+                certain agents to speak based on predefined rules. (allowed or disallowed)
             ask (str): The initial message to start the group chat and guide the conversation.
 
         Returns:
@@ -109,10 +113,12 @@ class Orchestrator:
 
         try:
             logging.info(f"[orchestrator] {self.short_id} Creating group chat.")
+            agents = agent_configuration["agents"]
             groupchat = autogen.GroupChat(
                 agents=agents, 
+                allowed_or_disallowed_speaker_transitions=agent_configuration["transitions"] ,
+                speaker_transitions_type=agent_configuration["transitions_type"],
                 messages=[],
-                allow_repeat_speaker=False,
                 max_round=self.max_rounds,
                 send_introductions=self.send_introductions
             )

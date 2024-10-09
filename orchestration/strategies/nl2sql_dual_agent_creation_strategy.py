@@ -127,4 +127,19 @@ class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             name="get_time",
             description="Provides the current time in the format HH:MM."
         )
-        return [user_proxy, assistant, advisor]
+
+        # Define allowed transitions between agents
+        allowed_transitions = {
+            advisor: [user_proxy, assistant],
+            user_proxy: [assistant],
+            assistant: [advisor, user_proxy],
+        }
+        
+        # Return agent configuration
+        agent_configuration = {
+            "agents": [user_proxy, assistant, advisor],
+            "transitions": allowed_transitions,
+            "transitions_type": "allowed"
+        }
+
+        return agent_configuration
