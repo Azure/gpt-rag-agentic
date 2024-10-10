@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
 """
-orc_client.py
+chat.py
 
-A command-line client to send questions to the ORC API endpoint.
+A command-line client to interact with the ORC API endpoint in a continuous chat manner.
 
 This script reads the API `URI` and `X_FUNCTIONS_KEY` from a `.env` file,
-prompts the user to input a question, sends a POST request with the provided question,
-and prints the response.
+allows the user to have a continuous conversation with the orchestrator,
+and handles special keyboard inputs to control the flow.
 
 Usage:
-    python answer.py
+    python chat.py
 
     Alternatively, after making the script executable:
-    ./answer.py
+    ./chat.py
 
 Environment Variables:
     - ORCHESTRATOR_ENDPOINT: The API endpoint URI.
     - FUNCTION_KEY: The API access key.
-
-Example `.env` File:
-    ORCHESTRATOR_ENDPOINT=https://random-prefix.azurewebsites.net/api/orc
-    FUNCTION_KEY=123ABCD==
 
 Requirements:
     - Python 3.x
@@ -66,16 +62,19 @@ def get_user_input():
         str: The user's input question.
     """
     try:
-        question = input("Please enter your question: ").strip()
+        question = input("You: ").strip()
         if not question:
-            print("Error: Question cannot be empty.")
-            sys.exit(1)
+            print("Error: Input cannot be empty.")
+            return None
         return question
+    except EOFError:
+        # Ctrl+D pressed
+        return 'CTRL_D'
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
         sys.exit(0)
 
-def send_question(uri, x_functions_key, question):
+def send_question(uri, x_functions_key, question, conversation_id):
     """
     Send the question to the ORC API and return the response.
 
@@ -83,6 +82,7 @@ def send_question(uri, x_functions_key, question):
         uri (str): The API endpoint URI.
         x_functions_key (str): The API access key.
         question (str): The question to send.
+        conversation_id (str): The conversation ID.
 
     Returns:
         dict: The API response parsed as a JSON object.
@@ -93,7 +93,7 @@ def send_question(uri, x_functions_key, question):
     }
 
     body = {
-        'conversation_id': "",
+        'conversation_id': conversation_id,
         'question': question
     }
 
@@ -113,30 +113,67 @@ def send_question(uri, x_functions_key, question):
         print(f"HTTP Request failed: {e}")
         sys.exit(1)
 
-def display_response(response_data):
+def display_answer(response_data):
     """
-    Display the API response with proper Unicode characters.
+    Display the answer from the API response.
 
     Args:
         response_data (dict): The API response as a JSON object.
     """
-    try:
-        # Pretty-print the JSON with Unicode characters unescaped
-        pretty_json = json.dumps(response_data, indent=4, ensure_ascii=False)
-        print(pretty_json)
-    except TypeError as e:
-        print("Error formatting the response:")
-        print(e)
-        print(response_data)
+    answer = response_data.get('answer', '')
+    if answer:
+        print(f"Assistant: {answer}")
+    else:
+        print("No answer provided in the response.")
+
+def display_thoughts_and_data_points(response_data):
+    """
+    Display the thoughts and data_points from the API response.
+
+    Args:
+        response_data (dict): The API response as a JSON object.
+    """
+    thoughts = response_data.get('thoughts', '')
+    data_points = response_data.get('data_points', '')
+    if thoughts or data_points:
+        print("\n--- Thoughts and Data Points from Last Response ---")
+        if thoughts:
+            print("Thoughts:")
+            print(thoughts)
+        if data_points:
+            print("\nData Points:")
+            print(data_points)
+        print("---------------------------------------------------\n")
+    else:
+        print("No thoughts or data_points in the last response.")
 
 def main():
     """
     Main function to execute the script logic.
     """
     uri, x_functions_key = load_environment()
-    question = get_user_input()
-    response_data = send_question(uri, x_functions_key, question)
-    display_response(response_data)
+    conversation_id = ""
+    last_response_data = None
+
+    while True:
+        user_input = get_user_input()
+        if user_input == 'CTRL_D':
+            # Display thoughts and data_points from last_response_data
+            if last_response_data:
+                display_thoughts_and_data_points(last_response_data)
+            else:
+                print("No previous response to display thoughts and data points.")
+            continue
+        elif user_input is None:
+            continue
+        else:
+            response_data = send_question(uri, x_functions_key, user_input, conversation_id)
+            last_response_data = response_data
+            # Update conversation_id
+            if 'conversation_id' in response_data:
+                conversation_id = response_data['conversation_id']
+            # Display only the answer
+            display_answer(response_data)
 
 if __name__ == '__main__':
     main()
