@@ -54,11 +54,11 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
             llm_config=llm_config
         )
 
-        # Create sentinel agent
-        sentinel_prompt = self._read_prompt("sentinel")
-        sentinel = AssistantAgent(
-            name="sentinel", 
-            system_message=sentinel_prompt, 
+        # Create chat closure agent
+        chat_closure_prompt = self._read_prompt("chat_closure")
+        chat_closure = AssistantAgent(
+            name="chat_closure", 
+            system_message=chat_closure_prompt, 
             human_input_mode="NEVER",
             llm_config=llm_config
         )
@@ -90,14 +90,14 @@ class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
 
         # Define allowed transitions between agents
         allowed_transitions = {
-            sentinel: [user_proxy],
+            chat_closure: [user_proxy],
             user_proxy: [assistant],
-            assistant: [sentinel, user_proxy],
+            assistant: [chat_closure, user_proxy],
         }
         
         # Return agent configuration
         agent_configuration = {
-            "agents": [user_proxy, assistant, sentinel],
+            "agents": [user_proxy, assistant, chat_closure],
             "transitions": allowed_transitions,
             "transitions_type": "allowed"
         }
