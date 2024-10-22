@@ -53,6 +53,15 @@ class NL2SQLSingleAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             llm_config=llm_config
         )
 
+        # Create chat closure agent
+        chat_closure_prompt = self._read_prompt("chat_closure")
+        chat_closure = AssistantAgent(
+            name="chat_closure", 
+            system_message=chat_closure_prompt, 
+            human_input_mode="NEVER",
+            llm_config=llm_config
+        )
+
         def get_schema_info(table_name: Optional[str] = None, column_name: Optional[str] = None) -> SchemaInfo:
             return self._get_schema_info(table_name, column_name)
 
@@ -116,15 +125,17 @@ class NL2SQLSingleAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
 
         # Define allowed transitions between agents
         allowed_transitions = {
+            chat_closure: [user_proxy],
             user_proxy: [assistant],
-            assistant: [user_proxy],
+            assistant: [chat_closure, user_proxy],
         }
         
         # Return agent configuration
         agent_configuration = {
-            "agents": [user_proxy, assistant],
+            "agents": [user_proxy, assistant, chat_closure],
             "transitions": allowed_transitions,
             "transitions_type": "allowed"
         }
+
 
         return agent_configuration

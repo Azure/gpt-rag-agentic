@@ -33,6 +33,50 @@ import sys
 import json
 import requests
 from dotenv import load_dotenv
+import logging
+import logging.config
+
+LOGGING_CONFIG = {
+    'version': 1,
+    'disable_existing_loggers': False,  # Allow existing loggers to propagate
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+        },
+    },
+    'handlers': {
+        'file_handler': {
+            'class': 'logging.FileHandler',
+            'filename': 'output.log',
+            'mode': 'a',
+            'formatter': 'standard',
+            'level': 'INFO',
+        },
+        'console_handler': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'standard',
+            'level': 'ERROR',
+        },
+    },
+    'root': {
+        'handlers': ['file_handler', 'console_handler'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        # Explicitly configure external loggers to propagate to root
+        'shared.util': {
+            'handlers': ['file_handler'],  # Only file handler
+            'level': 'INFO',
+            'propagate': True,
+        },
+        # Add more external loggers here if needed
+    },
+}
+
+# Apply the logging configuration without force=True
+logging.config.dictConfig(LOGGING_CONFIG)
+logger = logging.getLogger(__name__)  # Use a module-specific logger
 
 def load_environment():
     """
@@ -113,18 +157,108 @@ def send_question(uri, x_functions_key, question, conversation_id):
         print(f"HTTP Request failed: {e}")
         sys.exit(1)
 
-def display_answer(response_data):
+def display_answer(answer):
     """
-    Display the answer from the API response.
+    Display the assistant's answer, reasoning, and SQL query extracted from a JSON-formatted string or dictionary.
 
     Args:
-        response_data (dict): The API response as a JSON object.
+        answer (str or dict): The assistant's answer in JSON format within a code block or as a dictionary.
+                              Example as str:
+                              ```json
+                              {
+                                "answer": "Your answer here.",
+                                "reasoning": "Your reasoning here.",
+                                "sql_query": "Your SQL query here."
+                              }
+                              ```
+                              Example as dict:
+                              {
+                                "answer": "Your answer here.",
+                                "reasoning": "Your reasoning here.",
+                                "sql_query": "Your SQL query here."
+                              }
     """
-    answer = response_data.get('answer', '')
-    if answer:
-        print(f"Assistant: {answer}")
-    else:
-        print("No answer provided in the response.")
+    if not answer:
+        logger.warning("No answer provided.")
+        print("No answer provided.")
+        return
+
+    # ANSI escape sequences for colors
+    BLUE = '\033[94m'
+    GREY = '\033[90m'
+    RESET = '\033[0m'
+
+    try:
+        # If answer is a string, attempt to process it
+        if isinstance(answer, str):
+            # Remove the code block markers if present
+            stripped_answer = answer.strip()
+            if stripped_answer.startswith("```") and stripped_answer.endswith("```"):
+                # Split the string into lines and exclude the first and last lines (the backticks)
+                lines = stripped_answer.split("\n")
+                # Check if the first line starts with ``` and possibly a language identifier like ```json
+                if lines[0].startswith("```"):
+                    lines = lines[1:-1]
+                json_str = "\n".join(lines)
+            else:
+                json_str = stripped_answer
+
+            # Parse the JSON content
+            data = json.loads(json_str)
+
+        elif isinstance(answer, dict):
+            data = answer
+        else:
+            logger.error(f"Unsupported type for answer: {type(answer)}")
+            print("Assistant: Unsupported answer format.")
+            return
+
+        # Ensure the parsed data is a dictionary
+        if not isinstance(data, dict):
+            logger.error("Parsed JSON is not a dictionary.")
+            print("Assistant: The provided answer is not in the expected JSON object format.")
+            return
+
+        # Extract 'answer', 'reasoning', and 'sql_query' with default messages if keys are missing
+        assistant_answer = data.get("answer")
+        assistant_reasoning = data.get("reasoning")
+        assistant_sql_query = data.get("sql_query")
+        assistant_data_points = data.get("data_points")
+
+        # Check if 'answer' key exists and is not empty
+        if not assistant_answer:
+            logger.warning("'answer' key is missing or empty in the provided data.")
+            assistant_answer = "No answer provided."
+        else:
+            print(f"{BLUE}Answer: {assistant_answer}{RESET}")
+
+        # Similarly check for 'reasoning'
+        if not assistant_reasoning:
+            logger.warning("'reasoning' key is missing or empty in the provided data.")
+            assistant_reasoning = "No reasoning provided."
+        else:
+            print(f"{BLUE}Reasoning: {GREY}{assistant_reasoning}{RESET}")
+
+        # Similarly check for 'sql_query'
+        if not assistant_sql_query:
+            logger.warning("'sql_query' key is missing or empty in the provided data.")
+            assistant_sql_query = "No SQL query provided."
+        else:
+           print(f"{BLUE}SQL Query: {GREY}{assistant_sql_query}{RESET}")
+
+        # Similarly check for 'data_points'
+        if not assistant_data_points:
+            logger.warning("'data_points' key is missing or empty in the provided data.")
+            assistant_data_points = "No data_points provided."
+        else:
+            print(f"{BLUE}Data points: {GREY}{assistant_data_points}{RESET}")
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decoding failed: {e}")
+        print("Assistant: Unable to parse the answer due to invalid JSON format.")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
+        print("Assistant: An unexpected error occurred while processing the answer.")
 
 def display_thoughts_and_data_points(response_data):
     """
@@ -136,16 +270,21 @@ def display_thoughts_and_data_points(response_data):
     thoughts = response_data.get('thoughts', '')
     data_points = response_data.get('data_points', '')
     if thoughts or data_points:
-        print("\n--- Thoughts and Data Points from Last Response ---")
+        
+        BRIGHT_CYAN = '\033[96m'
+        RESET = '\033[0m'
+
+        print(f"{BRIGHT_CYAN}\n--- Agent Group Chat from Last Response ---")
         if thoughts:
-            print("Thoughts:")
             print(thoughts)
         if data_points:
             print("\nData Points:")
             print(data_points)
         print("---------------------------------------------------\n")
+        print(f"{RESET}")
     else:
-        print("No thoughts or data_points in the last response.")
+        logger.info("No group chat in the last response.")
+
 
 def main():
     """
