@@ -33,4 +33,4 @@ if ($packagesMissing) {
 }
 
 # Run the Python script if all packages are installed
-python .\evaluations\chat.py
+python chat.py

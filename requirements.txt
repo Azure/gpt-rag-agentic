@@ -20,6 +20,7 @@ autogen==0.3.0
 # pyautogen==0.2.33
 
 aiohttp==3.10.5
+asyncio==3.4.3
 
 # NL2SQL dependencies
 sqlparse==0.5.1

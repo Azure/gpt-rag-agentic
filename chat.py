@@ -17,6 +17,7 @@ Usage:
 Environment Variables:
     - ORCHESTRATOR_ENDPOINT: The API endpoint URI.
     - FUNCTION_KEY: The API access key.
+    - CALL_ORCHESTRATOR_ENDPOINT: Set to "True" to use the remote orchestrator.
 
 Requirements:
     - Python 3.x
@@ -35,6 +36,8 @@ import requests
 from dotenv import load_dotenv
 import logging
 import logging.config
+from orchestration import Orchestrator
+import asyncio
 
 LOGGING_CONFIG = {
     'version': 1,
@@ -74,15 +77,19 @@ LOGGING_CONFIG = {
     },
 }
 
-# Apply the logging configuration without force=True
+# Apply the logging configuration
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)  # Use a module-specific logger
 
-def load_environment():
+
+def get_rest_api_config():
     """
     Load environment variables from a `.env` file.
 
     Exits the program if required environment variables are missing.
+
+    Returns:
+        tuple: Contains uri (str), x_functions_key (str)
     """
     load_dotenv()
 
@@ -90,10 +97,10 @@ def load_environment():
     x_functions_key = os.getenv('FUNCTION_KEY')
 
     if not uri:
-        print("Error: ORCHESTRATOR_ENDPOINT not found in environment variables.")
+        logger.error("ORCHESTRATOR_ENDPOINT not found in environment variables.")
         sys.exit(1)
     if not x_functions_key:
-        print("Error: FUNCTION_KEY not found in environment variables.")
+        logger.error("FUNCTION_KEY not found in environment variables.")
         sys.exit(1)
 
     return uri, x_functions_key
@@ -103,7 +110,7 @@ def get_user_input():
     Prompt the user to input a question.
 
     Returns:
-        str: The user's input question.
+        str: The user's input question, or special commands like 'CTRL_D'.
     """
     try:
         question = input("You: ").strip()
@@ -118,9 +125,44 @@ def get_user_input():
         print("\nOperation cancelled by user.")
         sys.exit(0)
 
-def send_question(uri, x_functions_key, question, conversation_id):
+
+def send_question_to_python(question, conversation_id):
     """
-    Send the question to the ORC API and return the response.
+    Process the question using the orchestrator.
+
+    Args:
+        question (str): The user's question.
+        conversation_id (str): The conversation ID.
+
+    Returns:
+        dict: The response from the orchestrator.
+    """
+    # Use default client principal information
+    client_principal = {
+        'id': '00000000-0000-0000-0000-000000000000',
+        'name': 'anonymous'
+    }
+
+    # Call orchestrator
+    if question:
+        try:
+            orchestrator = Orchestrator(conversation_id, client_principal)
+            result = asyncio.run(orchestrator.answer(question))
+            if not isinstance(result, dict):
+                logger.error("Expected result to be a dictionary.")
+                return {"error": "Invalid response format from orchestrator."}
+            return result
+        except Exception as e:
+            logger.exception(f"An error occurred while orchestrating the question: {e}")
+            return {"error": "An error occurred while processing your question."}
+    else:
+        logger.warning("No question provided to orchestrate.")
+        return {"error": "No question provided."}
+
+
+def send_question_to_rest_api(uri, x_functions_key, question, conversation_id):
+    """
+    Send the question to the orchestrator API and return the response.
 
     Args:
         uri (str): The API endpoint URI.
@@ -147,36 +189,25 @@ def send_question(uri, x_functions_key, question, conversation_id):
 
         try:
             response_data = response.json()
+            if not isinstance(response_data, dict):
+                logger.error("Response JSON is not a dictionary.")
+                return {"error": "Invalid response format from orchestrator API."}
             return response_data
         except json.JSONDecodeError:
-            print("Error: Response is not valid JSON.")
-            print(response.text)
-            sys.exit(1)
+            logger.error("Response is not valid JSON.")
+            return {"error": "Response is not valid JSON."}
 
     except requests.exceptions.RequestException as e:
-        print(f"HTTP Request failed: {e}")
-        sys.exit(1)
+        logger.exception(f"HTTP Request failed: {e}")
+        return {"error": f"HTTP Request failed: {e}"}
+
 
 def display_answer(answer):
     """
     Display the assistant's answer, reasoning, and SQL query extracted from a JSON-formatted string or dictionary.
 
     Args:
-        answer (str or dict): The assistant's answer in JSON format within a code block or as a dictionary.
-                              Example as str:
-                              ```json
-                              {
-                                "answer": "Your answer here.",
-                                "reasoning": "Your reasoning here.",
-                                "sql_query": "Your SQL query here."
-                              }
-                              ```
-                              Example as dict:
-                              {
-                                "answer": "Your answer here.",
-                                "reasoning": "Your reasoning here.",
-                                "sql_query": "Your SQL query here."
-                              }
+        answer (dict): The assistant's answer in dictionary format.
     """
     if not answer:
         logger.warning("No answer provided.")
@@ -189,76 +220,33 @@ def display_answer(answer):
     RESET = '\033[0m'
 
     try:
-        # If answer is a string, attempt to process it
+        # Ensure the answer is a dictionary
         if isinstance(answer, str):
-            # Remove the code block markers if present
-            stripped_answer = answer.strip()
-            if stripped_answer.startswith("```") and stripped_answer.endswith("```"):
-                # Split the string into lines and exclude the first and last lines (the backticks)
-                lines = stripped_answer.split("\n")
-                # Check if the first line starts with ``` and possibly a language identifier like ```json
-                if lines[0].startswith("```"):
-                    lines = lines[1:-1]
-                json_str = "\n".join(lines)
-            else:
-                json_str = stripped_answer
+            answer = json.loads(answer)
 
-            # Parse the JSON content
-            data = json.loads(json_str)
-
-        elif isinstance(answer, dict):
-            data = answer
-        else:
-            logger.error(f"Unsupported type for answer: {type(answer)}")
-            print("Assistant: Unsupported answer format.")
-            return
-
-        # Ensure the parsed data is a dictionary
-        if not isinstance(data, dict):
+        if not isinstance(answer, dict):
             logger.error("Parsed JSON is not a dictionary.")
             print("Assistant: The provided answer is not in the expected JSON object format.")
             return
 
-        # Extract 'answer', 'reasoning', and 'sql_query' with default messages if keys are missing
-        assistant_answer = data.get("answer")
-        assistant_reasoning = data.get("reasoning")
-        assistant_sql_query = data.get("sql_query")
-        assistant_data_points = data.get("data_points")
+        # Extract keys with default messages if keys are missing
+        assistant_answer = answer.get("answer", "No answer provided.")
+        assistant_reasoning = answer.get("reasoning", "No reasoning provided.")
+        assistant_sql_query = answer.get("sql_query", "No SQL query provided.")
+        assistant_data_points = answer.get("data_points", "No data points provided.")
 
-        # Check if 'answer' key exists and is not empty
-        if not assistant_answer:
-            logger.warning("'answer' key is missing or empty in the provided data.")
-            assistant_answer = "No answer provided."
-        else:
-            print(f"{BLUE}Answer: {assistant_answer}{RESET}")
-
-        # Similarly check for 'reasoning'
-        if not assistant_reasoning:
-            logger.warning("'reasoning' key is missing or empty in the provided data.")
-            assistant_reasoning = "No reasoning provided."
-        else:
-            print(f"{BLUE}Reasoning: {GREY}{assistant_reasoning}{RESET}")
-
-        # Similarly check for 'sql_query'
-        if not assistant_sql_query:
-            logger.warning("'sql_query' key is missing or empty in the provided data.")
-            assistant_sql_query = "No SQL query provided."
-        else:
-           print(f"{BLUE}SQL Query: {GREY}{assistant_sql_query}{RESET}")
-
-        # Similarly check for 'data_points'
-        if not assistant_data_points:
-            logger.warning("'data_points' key is missing or empty in the provided data.")
-            assistant_data_points = "No data_points provided."
-        else:
-            print(f"{BLUE}Data points: {GREY}{assistant_data_points}{RESET}")
+        print(f"{BLUE}Answer: {assistant_answer}{RESET}")
+        print(f"{BLUE}Reasoning: {GREY}{assistant_reasoning}{RESET}")
+        print(f"{BLUE}SQL Query: {GREY}{assistant_sql_query}{RESET}")
+        print(f"{BLUE}Data Points: {GREY}{assistant_data_points}{RESET}")
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON decoding failed: {e}")
         print("Assistant: Unable to parse the answer due to invalid JSON format.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
+        logger.exception(f"An unexpected error occurred: {e}")
         print("Assistant: An unexpected error occurred while processing the answer.")
+
 
 def display_thoughts_and_data_points(response_data):
     """
@@ -270,7 +258,6 @@ def display_thoughts_and_data_points(response_data):
     thoughts = response_data.get('thoughts', '')
     data_points = response_data.get('data_points', '')
     if thoughts or data_points:
-        
         BRIGHT_CYAN = '\033[96m'
         RESET = '\033[0m'
 
@@ -283,14 +270,13 @@ def display_thoughts_and_data_points(response_data):
         print("---------------------------------------------------\n")
         print(f"{RESET}")
     else:
-        logger.info("No group chat in the last response.")
+        logger.info("No thoughts or data points in the last response.")
 
 
 def main():
     """
     Main function to execute the script logic.
     """
-    uri, x_functions_key = load_environment()
     conversation_id = ""
     last_response_data = None
 
@@ -306,13 +292,33 @@ def main():
         elif user_input is None:
             continue
         else:
-            response_data = send_question(uri, x_functions_key, user_input, conversation_id)
+            use_rest_api = os.getenv('USE_REST_API', "False").lower() == "true"
+            if use_rest_api:
+                uri, x_functions_key = get_rest_api_config()
+                response_data = send_question_to_rest_api(
+                    uri, x_functions_key, user_input, conversation_id)
+            else:
+                response_data = send_question_to_python(user_input, conversation_id)
+
+            if 'error' in response_data:
+                print(f"Error: {response_data['error']}")
+                logger.error(f"Error in response: {response_data['error']}")
+                continue
+
             last_response_data = response_data
             # Update conversation_id
             if 'conversation_id' in response_data:
                 conversation_id = response_data['conversation_id']
+            else:
+                logger.warning("No conversation_id in response data.")
+
             # Display only the answer
             display_answer(response_data)
 
+
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.exception(f"An unhandled exception occurred: {e}")
+        sys.exit(1)

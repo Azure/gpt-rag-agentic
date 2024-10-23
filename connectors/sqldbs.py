@@ -61,6 +61,7 @@ class SQLDBClient:
             "TrustServerCertificate=no;"
             "Connection Timeout=30"
         )
+        
         try:
             SQL_COPT_SS_ACCESS_TOKEN = 1256
             connection = pyodbc.connect(connection_string, attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct})

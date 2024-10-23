@@ -8,7 +8,7 @@ check_package_installed() {
 
 # Check if autogen and azure-functions are installed
 echo "🔍 Checking if required packages are installed..."
-if ! check_package_installed "autogen" || ! check_package_installed "azure-functions"; then
+if ! check_package_installed "autogen" || ! check_package_installed "asyncio"; then
     echo "⚠️ Oops! It looks like 'autogen' and/or 'azure-functions' are missing."
     echo "💡 Please run 'pip install -r requirements.txt' to install the necessary dependencies."
 else
@@ -16,4 +16,4 @@ else
 fi
 
 # Run the Python script
-python evaluations/chat.py
+python chat.py
