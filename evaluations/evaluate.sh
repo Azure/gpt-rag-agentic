@@ -16,4 +16,5 @@ else
 fi
 
 # Run the Python script
-python chat.py
+export PYTHONPATH=./:$PYTHONPATH
+python evaluations/genai_evaluation.py
