@@ -70,10 +70,7 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             return self._get_all_tables_info()
 
         def validate_sql_query(query: str) -> ValidateSQLResult:
-            return self._validate_sql_query(query)
-
-        def execute_sql_query(query: str) -> ExecuteSQLResult:
-            return self._execute_sql_query(query)        
+            return self._validate_sql_query(query)      
 
         # Register functions with assistant and user_proxy
         register_function(
@@ -100,13 +97,10 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Validate the syntax of an SQL query. Returns is_valid as True if valid, or is_valid as False with an error message if invalid."
         )
 
-        register_function(
-            execute_sql_query,
-            caller=assistant,
-            executor=user_proxy,
-            name="execute_sql_query",
-            description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row."
-        )
+        @user_proxy.register_for_execution()
+        @assistant.register_for_llm(description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row.")
+        async def execute_sql_query(query: str) -> ExecuteSQLResult:
+            return await self._execute_sql_query(query)   
 
         register_function(
             vector_index_retrieve,

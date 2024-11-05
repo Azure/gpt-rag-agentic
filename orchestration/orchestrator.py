@@ -139,7 +139,8 @@ class Orchestrator:
             with io.StringIO() as captured_output, contextlib.redirect_stdout(captured_output):
                 with warnings.catch_warnings(record=True) as wrngs:
                     logging.info(f"[orchestrator] {self.short_id} Initiating chat.")
-                    chat_result = agents[0].initiate_chat(manager, message=ask, summary_method="last_msg")
+                    chat_result = await agents[0].a_initiate_chat(manager, message=ask, summary_method="last_msg")
+                    # chat_result = agents[0].initiate_chat(manager, message=ask, summary_method="last_msg")
 
                 thought_process = captured_output.getvalue()
                 logging.info(f"[orchestrator] {self.short_id} Group chat thought process: \n{thought_process}.")

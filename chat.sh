@@ -15,5 +15,13 @@ else
     echo "✅ All required packages are installed!"
 fi
 
+# Load environment variables from .env file
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+    echo "🌍 Environment variables loaded from .env file."
+else
+    echo "⚠️ No .env file found. Please create one if you have environment-specific configurations."
+fi
+
 # Run the Python script
 python chat.py

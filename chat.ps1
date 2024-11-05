@@ -32,5 +32,19 @@ if ($packagesMissing) {
     Write-Host "All required packages are installed!" -ForegroundColor $colorSuccess
 }
 
+# Load environment variables from .env file
+if (Test-Path .env) {
+    Get-Content .env | ForEach-Object {
+        if ($_ -match "^\s*([^#=]+)\s*=\s*(.+?)\s*$") {
+            $envName = $matches[1].Trim()
+            $envValue = $matches[2].Trim()
+            [System.Environment]::SetEnvironmentVariable($envName, $envValue)
+        }
+    }
+    Write-Host "Environment variables loaded from .env file." -ForegroundColor $colorInfo
+} else {
+    Write-Host "Warning: No .env file found. Please create one if you have environment-specific configurations." -ForegroundColor $colorWarning
+}
+
 # Run the Python script if all packages are installed
 python chat.py

@@ -76,9 +76,6 @@ class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
         def validate_sql_query(query: str) -> ValidateSQLResult:
             return self._validate_sql_query(query)
 
-        def execute_sql_query(query: str) -> ExecuteSQLResult:
-            return self._execute_sql_query(query)        
-
         # Register functions with assistant and user_proxy
         register_function(
             get_schema_info,
@@ -96,13 +93,10 @@ class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Retrieve schema information from the data dictionary. Provide table_name or column_name to get information about the table or column."
         )
 
-        register_function(
-            execute_sql_query,
-            caller=assistant,
-            executor=user_proxy,
-            name="execute_sql_query",
-            description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row."
-        )
+        @user_proxy.register_for_execution()
+        @assistant.register_for_llm(description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row.")
+        async def execute_sql_query(query: str) -> ExecuteSQLResult:
+            return await self._execute_sql_query(query)   
 
         register_function(
             validate_sql_query,

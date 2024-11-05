@@ -52,14 +52,9 @@ class NL2SQLBaseAgentCreationStrategy(BaseAgentCreationStrategy, ABC):
         with open(data_dictionary_path, 'r') as f:
             self.data_dictionary = json.load(f)
 
-        # Initialize the database connection
-        self.connection = self.create_connection()
-        self.cursor = self.connection.cursor()
-
-
-    def create_connection(self):
+    async def create_connection(self):
         connector = SQLDBClient()
-        connection = connector.create_connection()
+        connection = await connector.create_connection()
         return connection
 
     @property
@@ -133,18 +128,21 @@ class NL2SQLBaseAgentCreationStrategy(BaseAgentCreationStrategy, ABC):
         except Exception as e:
             return ValidateSQLResult(is_valid=False, error=str(e))
 
-    def _execute_sql_query(self, query: str) -> ExecuteSQLResult:
+    async def _execute_sql_query(self, query: str) -> ExecuteSQLResult:
         """
         Execute an SQL query and return the results.
         Returns a list of dictionaries, each representing a row.
         """
         try:
+            connection = await self.create_connection()
+            cursor = connection.cursor()
+
             if not query.strip().lower().startswith('select'):
                 return ExecuteSQLResult(error="Only SELECT statements are allowed.")
 
-            self.cursor.execute(query)
-            columns = [column[0] for column in self.cursor.description]
-            rows = self.cursor.fetchall()
+            cursor.execute(query)
+            columns = [column[0] for column in cursor.description]
+            rows = cursor.fetchall()
             results = [dict(zip(columns, row)) for row in rows]
             return ExecuteSQLResult(results=results)
         except Exception as e:

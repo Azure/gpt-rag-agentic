@@ -153,7 +153,7 @@ The `nl2sql` strategies can also be configured to connect to a Teradata database
    TD_USER=teradata-username
    ```
 
-   Add the Teradata password to the solution Key Vault as a secret named `TD_PASSWORD`.
+   Add the Teradata password to the solution Key Vault as a secret named `teradataPassword`.
 
 3. **Permissions**
 
@@ -169,9 +169,9 @@ The `nl2sql` strategy uses the data dictionary to understand the database struct
 
 ### NL2SQL Few-Shot Strategy Configuration
 
-The `nl2sql_fewshot` strategy utilizes pre-defined query examples to improve the accuracy of the generated SQL queries. These examples are stored in files with the `.nl2sql` extension, such as [queries.nl2sql](config/queries.nl2sql). The query examples are essential for enabling the model to generate contextually relevant SQL based on the database structure and queries.
+The `nl2sql_fewshot` strategy utilizes pre-defined query examples to improve the accuracy of the generated SQL queries. These examples are stored in files with the `.json` extension, such as these [samples](https://github.com/Azure/gpt-rag-ingestion/tree/main/samples/nl2sql). The query examples are essential for enabling the model to generate contextually relevant SQL based on the database structure and queries.
 
-To ensure optimal retrieval of these examples during query generation, you need to ingest the `.nl2sql` files into an AI Search Index using the [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) component. This ensures that the query examples are efficiently indexed and retrieved in real time, enhancing the performance of the `nl2sql` strategy.
+To ensure optimal retrieval of these examples during query generation, ingest the query sample files into an AI Search Index using the [gpt-rag-ingestion](https://github.com/Azure/gpt-rag-ingestion/blob/main/docs/NL2SQL_INGESTION.md) component. This ensures that the query examples are efficiently indexed and retrieved in real time, enhancing the performance of the `nl2sql` strategy.
 
 > **Note:** Ensure that the examples in `.nl2sql` files are clear and contextually relevant to your database queries to maximize the model's performance in the `nl2sql` strategy.
 
