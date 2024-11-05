@@ -2,28 +2,25 @@ import logging
 import os
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
-from ..constants import NL2SQL_FEWSHOT
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
-from tools import queries_retrieval
+from tools import queries_retrieval, tables_retrieval, columns_retrieval
 from .nl2sql_base_agent_creation_strategy import (
     NL2SQLBaseAgentCreationStrategy,
-    SchemaInfo,
-    TablesList,
     ValidateSQLResult,
     ExecuteSQLResult
 )
 from tools import get_today_date, get_time
 
-class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
+class NL2SQLSingleAgentFewshotScaledtCreationStrategy(NL2SQLBaseAgentCreationStrategy):
 
     def __init__(self):
-        self.strategy_type = NL2SQL_FEWSHOT
+        self.strategy_type = "nl2sql_fewshot_scaled"
         super().__init__()
 
     @property
     def max_rounds(self):
-        return 20
+        return 30
 
     @property
     def send_introductions(self):
@@ -63,31 +60,30 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             llm_config=llm_config
         )        
 
-        def get_schema_info(table_name: Optional[str] = None, column_name: Optional[str] = None) -> SchemaInfo:
-            return self._get_schema_info(table_name, column_name)
-
-        def get_all_tables_info() -> TablesList:
-            return self._get_all_tables_info()
-
         def validate_sql_query(query: str) -> ValidateSQLResult:
-            return self._validate_sql_query(query)      
+            return self._validate_sql_query(query)
 
+        @user_proxy.register_for_execution()
+        @assistant.register_for_llm(description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row.")
+        async def execute_sql_query(query: str) -> ExecuteSQLResult:
+            return await self._execute_sql_query(query)   
         # Register functions with assistant and user_proxy
+
         register_function(
-            get_schema_info,
+            tables_retrieval,
             caller=assistant,
             executor=user_proxy,
-            name="get_schema_info",
-            description="Retrieve a list of all table names and their descriptions from the data dictionary."
+            name="tables_retrieval", 
+            description="Search for tables before the assistant generate a new query. Return tables and their descriptions.", 
         )
 
         register_function(
-            get_all_tables_info,
+            columns_retrieval,
             caller=assistant,
             executor=user_proxy,
-            name="get_all_tables_info",
-            description="Retrieve schema information from the data dictionary. Provide table_name or column_name to get information about the table or column."
-        )
+            name="columns_retrieval", 
+            description="Search for tables columns before the assistant generate a new query. Return columns and their descriptions.", 
+        )        
 
         register_function(
             validate_sql_query,
@@ -97,17 +93,12 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             description="Validate the syntax of an SQL query. Returns is_valid as True if valid, or is_valid as False with an error message if invalid."
         )
 
-        @user_proxy.register_for_execution()
-        @assistant.register_for_llm(description="Execute an SQL query and return the results as a list of dictionaries. Each dictionary represents a row.")
-        async def execute_sql_query(query: str) -> ExecuteSQLResult:
-            return await self._execute_sql_query(query)   
-
         register_function(
             queries_retrieval,
             caller=assistant,
             executor=user_proxy,
             name="queries_retrieval", 
-            description="Search for similar queries before the assistant generate a new query. Return sources.", 
+            description="Search for similar queries before the assistant generate a new query. Return queries.", 
         )
 
         register_function(
@@ -125,7 +116,7 @@ class NL2SQLSingleAgentFewshotCreationStrategy(NL2SQLBaseAgentCreationStrategy):
             name="get_time",
             description="Provides the current time in the format HH:MM."
         )
-        
+
         # Define allowed transitions between agents
         allowed_transitions = {
             chat_closure: [user_proxy],
