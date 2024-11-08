@@ -6,15 +6,15 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
 
 1. [**Concepts**](#concepts)
    - [1.1 How the Orchestrator Works](#how-the-orchestrator-works)
-   - [1.2 Agent Strategy Selection](#agent-strategy-selection)
-   - [1.3 Customizing Agent Strategies](#customizing-agent-strategies)
+   - [1.2 Agent Creation and Strategies](#agent-creation-and-strategies)
+   - [1.3 Create your Own Agent Strategy](#how-to-add-and-configure-you-own-agent-strategies)
 2. [**Running the Orchestrator**](#running-the-orchestrator)
    - [2.1 Running the Chat Client Locally](#running-the-chat-client-locally)
-   - [2.2 Running the Function Locally](#running-the-function-locally)
+   - [2.2 Running the Function Locally](docs/LOCAL_DEPLOYMENT.md)
    - [2.3 Cloud Deployment](#cloud-deployment)
 3. [**NL2SQL Strategies Configuration**](#nl2sql-strategies-configuration)
    - [3.1 Configuring NL2SQL Strategies](#configuring-nl2sql-strategies)
-   - [3.2 Data Dictionary](#data-dictionary)
+   - [3.2 Data Dictionary and Query samples](#nl2sql-data)
    - [3.3 Database Connection Setup](#database-connection-setup)
    - [3.3.1 SQL Database Connection](#sql-database-connection)
    - [3.3.2 Teradata Connection](#teradata-connection)
@@ -54,12 +54,12 @@ Each strategy defines how agents are created and configured. The creation code f
 
 3. **Defining Transitions**: The allowed transitions between agents are specified to control the flow of the conversation. For example, in the `classic_rag` strategy, the assistant agent can transition to either the chat closure agent or back to the user proxy agent.
 
-#### Group Chat Interaction
+#### Multi-Agent Group Chat
 
 The orchestrator utilizes AutoGen's group chat pattern to manage conversations involving multiple agents. The group chat is orchestrated by a `GroupChatManager`, which coordinates the interactions among agents based on the selected strategy. 
 
-![group chat](media/group_chat_adapted.png)
-*Overview of Agentic Orchestration Workflow, adapted from the AutoGen repository*
+![group chat](media/group_chat_adapted.png)<BR>
+*Illustration of a Group Chat Round, adapted from the AutoGen repository*
 
 The process involves:
 
@@ -81,7 +81,7 @@ The orchestrator is highly customizable, allowing developers to define custom st
 
 ### Selecting an Agent Strategy
 
-The **Enterprise RAG Agentic Orchestrator** provides a range of agent strategies to handle different types of queries and data interactions. Selecting the appropriate strategy ensures that the orchestrator operates efficiently and meets the specific needs of your application. This section outlines how to select a strategy and provides detailed descriptions of the available strategies.
+The **GPT-RAG Agentic Orchestrator** provides a range of agent strategies to handle different types of queries and data interactions. Selecting the appropriate strategy ensures that the orchestrator operates efficiently and meets the specific needs of your application. This section outlines how to select a strategy and provides detailed descriptions of the available strategies.
 
 ### How to Select a Strategy
 
@@ -105,15 +105,20 @@ To enhance the functionality and accuracy of SQL query generation, the orchestra
 
 - **nl2sql_dual**: The `nl2sql_dual` strategy introduces a dual-agent system where a second agent reviews and refines the generated SQL queries and responses. This additional layer of validation ensures higher accuracy and clarity in the translated queries, reducing the likelihood of errors and enhancing the reliability of the responses.
 
-### Adding Custom Strategies
+### How to Add and Configure you Own Agent Strategies
 
-If the available strategies do not fully meet your specific requirements, you can extend the orchestrator by implementing custom strategies. This flexibility allows you to tailor the orchestrator's behavior to unique use cases and operational demands.
+If the available strategies don’t fully meet your requirements, you can extend the orchestrator by implementing custom strategies. This flexibility lets you adapt the orchestrator’s behavior to unique use cases and operational demands.
+
+Define custom agent strategies by specifying distinctive agent behaviors. To create a custom strategy:
+
+1. **Subclass** `BaseAgentStrategy` and implement the `create_agents` method.
+2. **Register** the strategy in `AgentStrategyFactory` for environment variable selection.
 
 **Steps to Add a Custom Strategy:**
 
 1. **Create the Strategy Class:**  
-   Implement a new strategy by creating a class that inherits from the base strategy class and defines the necessary logic.
-
+   Define a new strategy by inheriting from the base strategy class and specifying the required logic.
+   
    ```python
    from .strategies.base_strategy import BaseAgentStrategy
 
@@ -124,7 +129,7 @@ If the available strategies do not fully meet your specific requirements, you ca
    ```
 
 2. **Update the AgentStrategyFactory:**  
-   Modify the `AgentStrategyFactory` to recognize and instantiate your custom strategy.
+   Modify `AgentStrategyFactory` to recognize and instantiate your custom strategy.
 
    ```python
    from .strategies.custom_agent_strategy import CustomAgentStrategy
@@ -140,21 +145,10 @@ If the available strategies do not fully meet your specific requirements, you ca
                raise ValueError(f"Unknown strategy type: {strategy_type}")
    ```
 
-3. **Set the Environment Variable:**  
-   Specify your custom strategy by setting the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable to `custom`.
+Ensure the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly set to the desired strategy name, whether a predefined strategy or a custom one you’ve implemented.
 
-Ensure that the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly set to the name of the desired strategy, whether it is one of the predefined strategies or a custom strategy you have implemented.
-
-### Summary
-
-Selecting the appropriate agent strategy is vital for optimizing the orchestrator's performance and ensuring it effectively meets your application's needs. By configuring the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable, you can easily switch between predefined strategies or introduce custom ones, providing the flexibility required for diverse operational scenarios.
-
-
-### Customizing Agent Strategies
-
-Define custom agent strategies by specifying unique agent behaviors. To create a custom strategy:
-1. Subclass `BaseAgentStrategy` and implement the `create_agents` method.
-2. Register the strategy in `AgentStrategyFactory` for environment variable selection.
+> [!NOTE]
+> The name `custom` is used here as an example. You should choose a name that best represents your specific case.
 
 ---
 
@@ -182,7 +176,7 @@ $env:AUTOGEN_ORCHESTRATION_STRATEGY = "nl2sql"
 
 ### Running the Function Locally
 
-To run the Azure Function locally, set up required configuration variables in your environment. Follow the Function's documentation for additional setup instructions.
+To run the Azure Function locally, see [Testing the Solution Locally in VS Code](docs/LOCAL_DEPLOYMENT.md).
 
 ### Cloud Deployment
 
