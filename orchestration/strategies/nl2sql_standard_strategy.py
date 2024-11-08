@@ -1,12 +1,12 @@
 import logging
 import os
 from autogen import UserProxyAgent, AssistantAgent, register_function
-from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
+from .nl2sql_base_agent_strategy import NL2SQLBaseStrategy
 from ..constants import NL2SQL
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
-from .nl2sql_base_agent_creation_strategy import (
-    NL2SQLBaseAgentCreationStrategy,
+from .nl2sql_base_agent_strategy import (
+    NL2SQLBaseStrategy,
     SchemaInfo,
     TablesList,
     ValidateSQLResult,
@@ -14,7 +14,7 @@ from .nl2sql_base_agent_creation_strategy import (
 )
 from tools import get_today_date, get_time
 
-class NL2SQLSingleAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
+class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
 
     def __init__(self):
         self.strategy_type = NL2SQL

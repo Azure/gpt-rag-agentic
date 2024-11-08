@@ -4,7 +4,7 @@ import os
 import sqlparse
 from abc import ABC, abstractmethod
 from connectors.sqldbs import SQLDBClient
-from .base_agent_creation_strategy import BaseAgentCreationStrategy
+from .base_agent_strategy import BaseAgentStrategy
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
 
@@ -28,7 +28,7 @@ class ExecuteSQLResult(BaseModel):
     results: Optional[List[Dict[str, Union[str, int, float, None]]]] = None
     error: Optional[str] = None
 
-class NL2SQLBaseAgentCreationStrategy(BaseAgentCreationStrategy, ABC):
+class NL2SQLBaseStrategy(BaseAgentStrategy, ABC):
 
     def __init__(self):
         super().__init__()

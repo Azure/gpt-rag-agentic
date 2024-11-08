@@ -4,11 +4,11 @@ import os
 import pyodbc
 from azure.identity import DefaultAzureCredential
 from autogen import UserProxyAgent, AssistantAgent, register_function
-from .nl2sql_base_agent_creation_strategy import NL2SQLBaseAgentCreationStrategy
-from ..constants import NL2SQL_DUAL
+from .nl2sql_base_agent_strategy import NL2SQLBaseStrategy
+from ..constants import NL2SQL_ADVISOR
 from typing import Optional, List, Dict, Union
-from .nl2sql_base_agent_creation_strategy import (
-    NL2SQLBaseAgentCreationStrategy,
+from .nl2sql_base_agent_strategy import (
+    NL2SQLBaseStrategy,
     SchemaInfo,
     TablesList,
     ValidateSQLResult,
@@ -16,10 +16,10 @@ from .nl2sql_base_agent_creation_strategy import (
 )
 from tools import get_today_date, get_time
 
-class NL2SQLDualAgentCreationStrategy(NL2SQLBaseAgentCreationStrategy):
+class NL2SQLAdvisorStrategy(NL2SQLBaseStrategy):
 
     def __init__(self):
-        self.strategy_type = NL2SQL_DUAL
+        self.strategy_type = NL2SQL_ADVISOR
         super().__init__()
 
     @property

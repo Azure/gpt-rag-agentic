@@ -4,7 +4,7 @@ import re
 
 from connectors import AzureOpenAIClient
 
-class BaseAgentCreationStrategy:
+class BaseAgentStrategy:
     def __init__(self):
         pass
 
@@ -66,12 +66,12 @@ class BaseAgentCreationStrategy:
         # Check for the custom prompt file first
         if os.path.exists(custom_file_path):
             selected_file = custom_file_path
-            logging.info(f"[base_agent_creation_strategy] Using custom file path: {custom_file_path}")            
+            logging.info(f"[base_agent_strategy] Using custom file path: {custom_file_path}")            
         elif os.path.exists(default_file_path):
             selected_file = default_file_path
-            logging.info(f"[base_agent_creation_strategy] Using default file path: {default_file_path}")                  
+            logging.info(f"[base_agent_strategy] Using default file path: {default_file_path}")                  
         else:
-            logging.error(f"[base_agent_creation_strategy] Prompt file for agent '{agent_name}' not found.")
+            logging.error(f"[base_agent_strategy] Prompt file for agent '{agent_name}' not found.")
             raise FileNotFoundError(f"Prompt file for agent '{agent_name}' not found.")
         
         # Read and process the selected prompt file
@@ -101,7 +101,7 @@ class BaseAgentCreationStrategy:
                 else:
                     # Log a warning if the placeholder cannot be replaced
                     logging.warning(
-                        f"[base_agent_creation_strategy] Placeholder '{{{{{placeholder_name}}}}}' could not be replaced."
+                        f"[base_agent_strategy] Placeholder '{{{{{placeholder_name}}}}}' could not be replaced."
                     )
             return prompt
 
@@ -133,5 +133,5 @@ class BaseAgentCreationStrategy:
             conversation_summary = aoai.get_completion(prompt)
         else:
             conversation_summary = "The conversation just started."
-        logging.info(f"[base_agent_creation_strategy] Conversation summary: {conversation_summary[:200]}")
+        logging.info(f"[base_agent_strategy] Conversation summary: {conversation_summary[:200]}")
         return conversation_summary

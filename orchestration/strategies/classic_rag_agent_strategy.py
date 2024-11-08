@@ -3,10 +3,10 @@ import logging
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from tools import vector_index_retrieve, get_today_date, get_time
 
-from .base_agent_creation_strategy import BaseAgentCreationStrategy
+from .base_agent_strategy import BaseAgentStrategy
 from ..constants import CLASSIC_RAG
 
-class ClassicRAGAgentCreationStrategy(BaseAgentCreationStrategy):
+class ClassicRAGAgentStrategy(BaseAgentStrategy):
 
     def __init__(self):
         super().__init__()

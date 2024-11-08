@@ -12,7 +12,7 @@ import json
 import contextlib
 
 from connectors import CosmosDBClient
-from .agent_creation_strategy_factory import AgentCreationStrategyFactory
+from .agent_strategy_factory import AgentStrategyFactory
 
 class Orchestrator:
     """
@@ -51,11 +51,11 @@ class Orchestrator:
         # Normalize orchestration strategy
         self.orchestration_strategy = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag').replace('-', '_')
 
-        # Agent creation strategy
+        # Agent strategy
         self._setup_llm_config()
-        self.agent_creation_strategy = AgentCreationStrategyFactory.get_creation_strategy(self.orchestration_strategy)
-        self.max_rounds = self.agent_creation_strategy.max_rounds
-        self.send_introductions = self.agent_creation_strategy.send_introductions
+        self.agent_strategy = AgentStrategyFactory.get_strategy(self.orchestration_strategy)
+        self.max_rounds = self.agent_strategy.max_rounds
+        self.send_introductions = self.agent_strategy.send_introductions
 
     ### Main functions
 
@@ -103,8 +103,8 @@ class Orchestrator:
         Returns:
             list: A list of agent configurations.
         """
-        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_creation_strategy.strategy_type} strategy.")
-        return self.agent_creation_strategy.create_agents(self.llm_config, history)
+        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
+        return self.agent_strategy.create_agents(self.llm_config, history)
 
     async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
         """

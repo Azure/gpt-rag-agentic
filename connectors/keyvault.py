@@ -1,4 +1,5 @@
 import os
+import logging
 from azure.identity.aio import DefaultAzureCredential as AsyncDefaultAzureCredential
 from azure.keyvault.secrets.aio import SecretClient as AsyncSecretClient
 from azure.core.exceptions import ResourceNotFoundError, ClientAuthenticationError
@@ -17,14 +18,14 @@ async def get_secret(secretName):
                 value = retrieved_secret.value
         return value    
     except KeyError:
-        print("Environment variable AZURE_KEY_VAULT_NAME not found.")
+        logging.info("Environment variable AZURE_KEY_VAULT_NAME not found.")
         return None
     except ClientAuthenticationError:
-        print("Authentication failed. Please check your credentials.")
+        logging.info("Authentication failed. Please check your credentials.")
         return None
     except ResourceNotFoundError:
-        print(f"Secret '{secretName}' not found in the Key Vault.")
+        logging.info(f"Secret '{secretName}' not found in the Key Vault.")
         return None
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logging.info(f"An unexpected error occurred: {e}")
         return None

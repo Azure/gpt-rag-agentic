@@ -1,197 +1,192 @@
 # Enterprise RAG Agentic Orchestrator
 
-This Orchestrator is part of the **Enterprise RAG (GPT-RAG)** Solution Accelerator.
+Part of [GPT-RAG](https://aka.ms/gpt-rag)
 
-To learn more about the Enterprise RAG, please go to [https://aka.ms/gpt-rag](https://aka.ms/gpt-rag).
+## Table of Contents
 
-## How the Agentic Orchestrator Works
+1. [**Concepts**](#concepts)
+   - [1.1 How the Orchestrator Works](#how-the-orchestrator-works)
+   - [1.2 Agent Strategy Selection](#agent-strategy-selection)
+   - [1.3 Customizing Agent Strategies](#customizing-agent-strategies)
+2. [**Running the Orchestrator**](#running-the-orchestrator)
+   - [2.1 Running the Chat Client Locally](#running-the-chat-client-locally)
+   - [2.2 Running the Function Locally](#running-the-function-locally)
+   - [2.3 Cloud Deployment](#cloud-deployment)
+3. [**NL2SQL Strategies Configuration**](#nl2sql-strategies-configuration)
+   - [3.1 Configuring NL2SQL Strategies](#configuring-nl2sql-strategies)
+   - [3.2 Data Dictionary](#data-dictionary)
+   - [3.3 Database Connection Setup](#database-connection-setup)
+   - [3.3.1 SQL Database Connection](#sql-database-connection)
+   - [3.3.2 Teradata Connection](#teradata-connection)
+4. [**Evaluation**](#evaluation)
+5. [**Contributing**](#contributing)
+6. [**Trademarks**](#trademarks)
 
-The **Enterprise RAG Agentic Orchestrator** utilizes AutoGen's group chat feature to enable multiple agents to collaborate on complex tasks. In this system, agents are created based on the chosen strategy and interact in a chat-like environment to achieve a common goal. Each agent has a distinct role—such as querying databases, retrieving knowledge, or synthesizing information—and they work together in a sequence to provide a comprehensive response.
+---
 
-The orchestrator coordinates these interactions, allowing for multiple rounds of conversation between agents, ensuring tasks are completed efficiently. The group chat feature is highly customizable, and users can define their own strategies and agent behaviors to suit specific business needs.
+## Concepts
 
-## Selecting an Agent Strategy
+### How the Orchestrator Works
 
-You can select an agent strategy through environment variables. By default, the orchestrator uses the `classic_rag` strategy, which is optimized for retrieving information from a knowledge base. Alternatively, the `nl2sql` and the experimental `nl2sql_dual` strategies can be selected for scenarios where natural language queries are converted into SQL to query a relational database.
+The **GPT-RAG Agentic Orchestrator** is a powerful system that leverages AutoGen's group chat capabilities to facilitate collaboration among multiple specialized agents. This orchestrator is designed to handle complex tasks by coordinating the interactions of agents, each with a specific role, to produce coherent and accurate responses.
 
-### Available Strategies
+#### Architecture Overview
 
-- **classic_rag**: Retrieves answers from a knowledge base.
-- **nl2sql**: Converts user questions into SQL queries to retrieve data from a relational database.
+At its core, the orchestrator employs a factory pattern to create agents based on predefined strategies. The `AgentStrategyFactory` is responsible for instantiating the appropriate agents according to the selected strategy, such as `classic_rag` or `nl2sql`. Each strategy defines a unique set of agents, their roles, and how they interact within the group chat.
 
-#### Experimental Strategies
+#### Agent Creation and Strategies
 
-- **nl2sql_dual**: Introduces a second agent to review and refine SQL queries and responses for improved accuracy and clarity.
-- **nl2sql_fewshot**: A variation of the single-agent approach that uses AI search to find similar queries, improving SQL generation accuracy.
+The orchestrator supports various strategies to address different types of queries and data interactions. For example:
 
-To configure the orchestrator to use a specific agent strategy:
+- **Classic RAG Strategy (`classic_rag`)**: This strategy focuses on retrieval-augmented generation, where agents work together to retrieve relevant information from a knowledge base and generate responses grounded in that information.
 
-1. **Set the environment variable**:  
-   Set `AUTOGEN_ORCHESTRATION_STRATEGY` to the desired strategy name.
+- **NL2SQL Strategy (`nl2sql`)**: This strategy enables the system to translate natural language queries into SQL statements, allowing users to interact with databases using everyday language.
 
-   Example:
+Each strategy defines how agents are created and configured. The creation code for each strategy involves:
 
-   ```bash
-   export AUTOGEN_ORCHESTRATION_STRATEGY=nl2sql
+1. **Creating Agents**: Agents are instantiated with specific roles and system messages. For instance, in the `classic_rag` strategy, the agents include:
+
+   - **UserProxyAgent**: Acts as a proxy for the user, executing any function calls made by AssistantAgent
+   - **AssistantAgent**: Responsible for generating responses, using the conversation history summarized for context.
+   - **ChatClosureAgent**: Manages the closure of the conversation.
+
+2. **Registering Functions**: Functions, which we can also refer to as tools, are registered to enable agents to perform specific tasks, such as retrieving data from a vector index or getting the current date and time. These functions are registered with the assistant agent as the caller and the user proxy agent as the executor.
+
+3. **Defining Transitions**: The allowed transitions between agents are specified to control the flow of the conversation. For example, in the `classic_rag` strategy, the assistant agent can transition to either the chat closure agent or back to the user proxy agent.
+
+#### Group Chat Interaction
+
+The orchestrator utilizes AutoGen's group chat pattern to manage conversations involving multiple agents. The group chat is orchestrated by a `GroupChatManager`, which coordinates the interactions among agents based on the selected strategy. 
+
+![group chat](media/group_chat_adapted.png)
+*Overview of Agentic Orchestration Workflow, adapted from the AutoGen repository*
+
+The process involves:
+
+1. **Initiation**: The user proxy agent initiates the conversation with a user query.
+
+2. **Agent Communication**: Agents communicate by sending messages to each other, following the allowed transitions. They may call registered functions to perform tasks like data retrieval or query execution.
+
+3. **Response Generation**: The assistant agent synthesizes the information gathered and generates a response to the user's query.
+
+4. **Conversation Closure**: The chat closure agent manages the termination of the conversation when appropriate.
+
+#### Multi-Round Interactions
+
+The orchestrator supports multiple interaction rounds, allowing agents to share insights and collaborate efficiently. The `max_rounds` property in each strategy defines the maximum number of rounds permitted. This enables complex queries to be addressed thoroughly, with agents iteratively refining the response.
+
+#### Customization and Extensibility
+
+The orchestrator is highly customizable, allowing developers to define custom strategies and agent behaviors. By subclassing `BaseAgentStrategy` and implementing the `create_agents` method, new strategies can be created to meet specific requirements. This extensibility ensures that the orchestrator can adapt to a wide range of operational scenarios.
+
+### Selecting an Agent Strategy
+
+The **Enterprise RAG Agentic Orchestrator** provides a range of agent strategies to handle different types of queries and data interactions. Selecting the appropriate strategy ensures that the orchestrator operates efficiently and meets the specific needs of your application. This section outlines how to select a strategy and provides detailed descriptions of the available strategies.
+
+### How to Select a Strategy
+
+The orchestrator selects the agent strategy based on the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable. Be sure to set this variable to the name of the desired strategy. If you're running the chat client locally, set this variable in your shell environment. For deployments as a Function App, define it in the application settings.
+
+#### Available Strategies
+
+The orchestrator supports the following strategies, each tailored to specific needs:
+
+- **classic_rag**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
+
+- **nl2sql**: The `nl2sql` strategy enables the orchestrator to convert natural language queries into SQL statements. This allows users to interact with relational databases using everyday language, simplifying data retrieval processes without requiring users to write complex SQL queries.
+
+##### Additional NL2SQL Strategies
+
+To enhance the functionality and accuracy of SQL query generation, the orchestrator offers specialized variations of the `nl2sql` strategy:
+
+- **nl2sql_fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
+
+- **nl2sql_fewshot_scaled**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
+
+- **nl2sql_dual**: The `nl2sql_dual` strategy introduces a dual-agent system where a second agent reviews and refines the generated SQL queries and responses. This additional layer of validation ensures higher accuracy and clarity in the translated queries, reducing the likelihood of errors and enhancing the reliability of the responses.
+
+### Adding Custom Strategies
+
+If the available strategies do not fully meet your specific requirements, you can extend the orchestrator by implementing custom strategies. This flexibility allows you to tailor the orchestrator's behavior to unique use cases and operational demands.
+
+**Steps to Add a Custom Strategy:**
+
+1. **Create the Strategy Class:**  
+   Implement a new strategy by creating a class that inherits from the base strategy class and defines the necessary logic.
+
+   ```python
+   from .strategies.base_strategy import BaseAgentStrategy
+
+   class CustomAgentStrategy(BaseAgentStrategy):
+       def execute(self, query):
+           # Implement custom strategy logic here
+           pass
    ```
 
-## Customizing or Creating New Strategies
+2. **Update the AgentStrategyFactory:**  
+   Modify the `AgentStrategyFactory` to recognize and instantiate your custom strategy.
 
-You can extend the orchestrator by creating your own agent creation strategies to meet specific needs. These strategies define how agents are created and interact with each other.
+   ```python
+   from .strategies.custom_agent_strategy import CustomAgentStrategy
 
-1. **Create a Custom Strategy**:  
-   Subclass `BaseAgentCreationStrategy` and implement the `create_agents` method to define how your agents behave.
+   class AgentStrategyFactory:
+       @staticmethod
+       def get_strategy(strategy_type: str):
+           # Existing strategy selections
+           if strategy_type == 'custom':
+               return CustomAgentStrategy()
+           # Other strategies...
+           else:
+               raise ValueError(f"Unknown strategy type: {strategy_type}")
+   ```
 
-2. **Register the Custom Strategy**:  
-   Register your strategy with the `AgentCreationStrategyFactory` so that it can be selected using the appropriate environment variable.
+3. **Set the Environment Variable:**  
+   Specify your custom strategy by setting the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable to `custom`.
 
-## Modifying Prompts
+Ensure that the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly set to the name of the desired strategy, whether it is one of the predefined strategies or a custom strategy you have implemented.
 
-Agent behavior is guided by prompt files located in the `prompts` directory. These prompts define how agents communicate and perform tasks. You can customize these prompts to adjust the behavior of agents in any strategy.
+### Summary
 
-### Prompt File Structure
+Selecting the appropriate agent strategy is vital for optimizing the orchestrator's performance and ensuring it effectively meets your application's needs. By configuring the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable, you can easily switch between predefined strategies or introduce custom ones, providing the flexibility required for diverse operational scenarios.
 
-- **Base Directory**: `prompts/`
-- **Strategy Subdirectory**: If your strategy has a `strategy_type`, prompts are located in `prompts/{strategy_type}/`.
-- **Prompt Files**:
-  - **Default Prompt File**: `{agent_name}.txt`
-  - **Custom Prompt File**: `{agent_name}.custom.txt`
 
-### Using Custom Prompt Files
+### Customizing Agent Strategies
 
-To customize an agent's prompt without altering the default prompt file, you can create a custom prompt file:
+Define custom agent strategies by specifying unique agent behaviors. To create a custom strategy:
+1. Subclass `BaseAgentStrategy` and implement the `create_agents` method.
+2. Register the strategy in `AgentStrategyFactory` for environment variable selection.
 
-1. **Create a Custom Prompt File**:
-   - Name your custom prompt file as `{agent_name}.custom.txt`.
-   - Place it in the appropriate prompts directory (e.g., `prompts/{strategy_type}/`).
+---
 
-2. **Prompt File Lookup Order**:
-   - The orchestrator will first look for `{agent_name}.custom.txt`.
-   - If not found, it will fall back to `{agent_name}.txt`.
-   - If neither file is found, an error will be raised.
+## Running the Orchestrator
 
-### Using Placeholders in Prompts
+### Running the Chat Client Locally
 
-Prompts can contain placeholders that will be dynamically replaced at runtime. Placeholders follow the format `{{placeholder_name}}`.
+1. Set the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable to run the NL2SQL chat client locally:
 
-#### Placeholder Replacement Process
-
-1. **Provided Placeholders**:
-   - When reading the prompt, you can supply a `placeholders` dictionary where keys are placeholder names and values are their replacements.
-   - Any placeholders matching the keys in this dictionary will be replaced with their corresponding values.
-
-2. **Common Placeholder Files**:
-   - For any remaining placeholders not replaced by the provided `placeholders` dictionary, the orchestrator will search for files named `{placeholder_name}.txt` in the `prompts/common/` directory.
-   - If such a file exists, the placeholder will be replaced with the content of that file.
-
-3. **Unmatched Placeholders**:
-   - If a placeholder cannot be replaced (i.e., no provided value and no matching file), a warning will be logged, and the placeholder will remain in the prompt.
-
-#### Example
-
-Suppose you have a prompt for an agent named `assistant` with the following content:
-
-```
-{{greeting}}
-
-I am here to assist you with your tasks.
-
-{{closing}}
-```
-
-- **Using Provided Placeholders**:
-  - If you supply a `placeholders` dictionary like `{'greeting': 'Hello there!', 'closing': 'Best regards.'}`, the placeholders `{{greeting}}` and `{{closing}}` will be replaced accordingly.
-
-- **Using Common Placeholder Files**:
-  - If you do not provide values for `{{greeting}}` and `{{closing}}`, the orchestrator will look for `prompts/common/greeting.txt` and `prompts/common/closing.txt`.
-  - If these files exist and contain text, the placeholders will be replaced with that content.
-
-- **Unmatched Placeholders**:
-  - If neither the `placeholders` dictionary provides values nor the common files exist, the placeholders will remain in the prompt, and a warning will be logged.
-
-## Configuring the `nl2sql` Strategies
-
-The `nl2sql`, `nl2sql_dual`, and `nl2sql_fewshot` strategies enable agents to convert natural language queries into SQL statements to retrieve data from a relational database. While their configurations are similar, the `nl2sql_dual` strategy introduces an additional agent to enhance query formation and response accuracy. The `nl2sql_fewshot` strategy, on the other hand, is based on a single agent but brings similar query examples into the conversation.
-
-### Configuring the SQL Database Connection
-
-To set up the connection to your SQL Database, ensure your identity has `db_datareader` permissions. Configure the connection using the following environment variables either in the Function App settings or as local environment variables for testing purposes:
-
+**Bash:**
 ```bash
-SQL_DATABASE_SERVER=my-database-server
-SQL_DATABASE_NAME=my-database-name
-SQL_DATABASE_TYPE=[sqldatabase or fabric]
+export AUTOGEN_ORCHESTRATION_STRATEGY=nl2sql
 ```
 
-- **For SQL Database**: Use `SQL_DATABASE_SERVER` as your database server name and `SQL_DATABASE_NAME` as your database name.
+**PowerShell:**
+```powershell
+$env:AUTOGEN_ORCHESTRATION_STRATEGY = "nl2sql"
+```
 
-- **For Fabric SQL Endpoint**: Use `SQL_DATABASE_SERVER` as the full SQL connection string and `SQL_DATABASE_NAME` as the name of the Lakehouse or Warehouse you want to connect to.
+2. Rename the `.env.template` file to `.env` and update the variables as needed.
 
-The connection to the SQL Database uses ODBC and Azure Entra ID for authentication, supporting managed identities. For more information on configuring SQL Database permissions, refer to [this guide](https://learn.microsoft.com/azure/azure-sql/database/azure-sql-python-quickstart).
+3. Run `./chat.sh` (for Bash) or `./chat.ps1` (for PowerShell) to start the client locally.
 
-> **Note:**  
-> Both SQL Database and Fabric SQL Endpoints are supported. If you are working with other database types, you may need to adjust the [SQLDBClient](connectors/sqldbs.py) accordingly.
+![chat client](media/running_chat_client.png)
 
-### Configuring the Teradata Connection
+### Running the Function Locally
 
-The `nl2sql` strategies can also be configured to connect to a Teradata database. To set up the connection to your Teradata database, ensure you have the necessary permissions and that your credentials are securely managed.
+To run the Azure Function locally, set up required configuration variables in your environment. Follow the Function's documentation for additional setup instructions.
 
-1. **Install the Teradata SQL Driver**
+### Cloud Deployment
 
-   Ensure that the `teradatasql` Python library is installed in your environment:
-
-   ```bash
-   pip install teradatasql
-   ```
-
-2. **Set the Environment Variables**
-
-   Configure the connection using the following environment variables, similar to how it's done for SQL Database:
-
-   ```bash
-   TD_HOST=teradata-host
-   TD_USER=teradata-username
-   ```
-
-   Add the Teradata password to the solution Key Vault as a secret named `teradataPassword`.
-
-3. **Permissions**
-
-   Make sure that your Teradata user account has the necessary permissions to execute queries and access the required tables.
-
-By configuring these settings, the orchestrator's `nl2sql` strategies can connect to a Teradata database and execute SQL queries generated from natural language inputs.
-
-> **Note:** The `SQLDBClient` in the orchestrator supports Teradata connections using the `teradatasql` library. It reads connection parameters from environment variables, and the password is securely retrieved from the Key Vault.
-
-### Updating the Data Dictionary
-
-The `nl2sql` strategy uses the data dictionary to understand the database structure. Functions `get_all_tables_info` and `get_schema_info` retrieve table and column details, enabling accurate SQL query generation. Ensure your database's data dictionary in `config/data_dictionary.json` is up-to-date for optimal performance.
-
-### NL2SQL Few-Shot Strategy Configuration
-
-The `nl2sql_fewshot` strategy utilizes pre-defined query examples to improve the accuracy of the generated SQL queries. These examples are stored in files with the `.json` extension, such as these [samples](https://github.com/Azure/gpt-rag-ingestion/tree/main/samples/nl2sql). The query examples are essential for enabling the model to generate contextually relevant SQL based on the database structure and queries.
-
-To ensure optimal retrieval of these examples during query generation, ingest the query sample files into an AI Search Index using the [gpt-rag-ingestion](https://github.com/Azure/gpt-rag-ingestion/blob/main/docs/NL2SQL_INGESTION.md) component. This ensures that the query examples are efficiently indexed and retrieved in real time, enhancing the performance of the `nl2sql` strategy.
-
-> **Note:** Ensure that the examples in `.nl2sql` files are clear and contextually relevant to your database queries to maximize the model's performance in the `nl2sql` strategy.
-
-By following these steps, you can configure and customize the `nl2sql` strategy to handle SQL queries effectively. The flexibility of this strategy also allows for adaptation to other data sources beyond SQL databases.
-
-## Cloud Deployment
-
-To deploy the orchestrator in the cloud for the first time, please follow the deployment instructions provided in the [Enterprise RAG repo](https://github.com/Azure/GPT-RAG?tab=readme-ov-file#getting-started).
-
-These instructions include the necessary infrastructure templates to provision the solution in the cloud.
-
-Once the infrastructure is provisioned, you can redeploy just the orchestrator component using the instructions below:
-
-First, please confirm that you have met the prerequisites:
-
-- Azure Developer CLI: [Download azd for Windows](https://azdrelease.azureedge.net/azd/standalone/release/1.5.0/azd-windows-amd64.msi), [Other OS's](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd).
-- Git: [Download Git](https://git-scm.com/downloads)
-- Python 3.11: [Download Python](https://www.python.org/downloads/release/python-3118/)
-
-Then just clone this repository and reproduce the following commands within the gpt-rag-orchestrator directory:
+Deploy the orchestrator to the cloud using the Azure Developer CLI:
 
 ```bash
 azd auth login
@@ -199,28 +194,96 @@ azd env refresh
 azd deploy
 ```
 
-> **Note:** When running the `azd env refresh`, use the same environment name, subscription, and region used in the initial provisioning of the infrastructure.
+Ensure prerequisites, like Python 3.11, Azure Developer CLI, and Git, are installed.
 
-## Running Locally with VS Code
+---
 
-[How can I test the solution locally in VS Code?](docs/LOCAL_DEPLOYMENT.md)
+## NL2SQL Strategies Configuration
 
-## Evaluating
+### Configuring NL2SQL Strategies
 
-To assess the performance of the Orchestrator, we have provided an evaluation program that allows you to test and measure its capabilities.
+This section provides configuration steps for the various NL2SQL strategies. These strategies convert natural language queries into SQL statements compatible with your databases.
 
-For detailed instructions on how to run the evaluation program, set up the environment, and prepare test data, please refer to the [Evaluation Documentation](docs/EVALUATION.md).
+### NL2SQL Data
+
+**Data Dictionary**
+
+The Data Dictionary is essential for SQL generation, providing a structured reference for database tables and columns. If you're using the standard `nl2sql` strategy, simply review and update the `config/data_dictionary.json` file as needed.
+
+> [!NOTE]
+> If you prefer, you can create a `config/data_dictionary.custom.json` file, which will override the example file in `config/data_dictionary.json`.
+
+If you're using the `nl2sql_fewshot_scaled` strategy, the `data_dictionary.json` file will not be used. In this case, you'll need to create the JSON files differently to be indexed. You can refer to the examples in [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) to see how to set up the table and column files for AI Search indexing.
+
+**Queries**
+
+If you've chosen the `nl2sql_fewshot` or `nl2sql_fewshot_scaled` strategy, you'll need to create example queries and index them in AI Search. For guidance on creating and indexing queries, as well as for example queries, refer to [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion).
+
+### Database Connection Setup
+
+Set up database connections by configuring the required environment variables for each target database.
+
+### SQL Database Connection
+
+To set up a connection to your SQL Database, follow these steps based on your authentication method.
+
+1. **Configure environment variables:**
+
+    ```bash
+    SQL_DATABASE_SERVER=my-database-server
+    SQL_DATABASE_NAME=my-database-name
+    ```
+
+    - If using **SQL Authentication**, also set the following environment variable and store the user's password securely in Key Vault as a secret named `sqlDatabasePassword`:
+      
+      ```bash
+      SQL_DATABASE_UID=my-username
+      ```
+
+    - If using **Azure Active Directory (AAD) Authentication**, **do not set** the `SQL_DATABASE_UID` variable. The application will use the identity associated with your environment.
+
+2. **Permissions:**
+    Ensure your identity has the `db_datareader` role on the database. For more details on setting up your permissions, refer to the [SQL Database Setup Guide](https://learn.microsoft.com/azure/azure-sql/database/azure-sql-python-quickstart).
+
+3. **Connection details in code:**
+
+   - If `SQL_DATABASE_UID` is set, the code will use SQL Authentication, retrieving the password from the Key Vault.
+   - If `SQL_DATABASE_UID` is not set, the code will default to Azure AD token-based authentication. 
+
+### Teradata Connection
+
+To set up a connection to your Teradata database, follow these steps:
+
+1. **Install the Teradata SQL driver**:
+
+    ```bash
+    pip install teradatasql
+    ```
+
+2. **Configure Teradata connection settings in your environment**:
+
+    ```bash
+    TD_HOST=teradata-host
+    TD_USER=teradata-username
+    ```
+
+3. **Set up the password**:
+
+   - Store the Teradata password securely in Key Vault under the name `teradataPassword`.
+
+4. **Permissions**:
+
+    Ensure your Teradata user has the necessary permissions for query access.
+
+## Evaluation
+
+An evaluation program is provided for testing the orchestrator's performance. 
+<BR>Refer to the [Evaluation Documentation](docs/EVALUATION.md) for details.
 
 ## Contributing
 
-We appreciate your interest in contributing to this project! Please refer to the [CONTRIBUTING.md](https://github.com/Azure/GPT-RAG/blob/main/CONTRIBUTING.md) page for detailed guidelines on how to contribute, including information about the Contributor License Agreement (CLA), code of conduct, and the process for submitting pull requests.
-
-Thank you for your support and contributions!
+For contribution guidelines, refer to [CONTRIBUTING.md](https://github.com/Azure/GPT-RAG/blob/main/CONTRIBUTING.md).
 
 ## Trademarks
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+This project may contain trademarks. Follow [Microsoft's Trademark Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general) for proper use.

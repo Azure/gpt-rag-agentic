@@ -24,7 +24,9 @@ class SQLDBClient:
         server = os.environ.get('SQL_DATABASE_SERVER', 'replace_with_database_server_name')
         database = os.environ.get('SQL_DATABASE_NAME', 'replace_with_database_name')
         uid = os.environ.get('SQL_DATABASE_UID', None)
-        pwd = await get_secret('sqlDatabasePassword')
+        pwd = None
+        if uid:
+            pwd = await get_secret('sqlDatabasePassword')
 
         connection_string = (
                 f"Driver={{ODBC Driver 18 for SQL Server}};"

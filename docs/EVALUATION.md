@@ -106,7 +106,7 @@ The evaluation program performs the following steps:
 
    - Reads each question from the test data file.
    - For each question:
-     - Sends a request to the GenaI Orchestrator with the question.
+     - Sends a request to the GenAI Orchestrator with the question.
      - Receives the answer, context (data points), and reasoning (thoughts).
      - Measures the processing time for generating the answer.
      - Logs any errors encountered during the process.
