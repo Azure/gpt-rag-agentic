@@ -29,13 +29,9 @@ Once the cloud resources (such as CosmosDB and KeyVault) have been provisioned a
 
 8. Done! Now you just need to hit F5 (Start Debugging) to run the orchestrator function at  `http://localhost:7071/api/orc`.
 
-**Note:** you can download this [Postman Collection](../tests/gpt-rag-orchestration.postman_collection.json) to test your orchestrator endpoint.
-
 ### Roles you have to assign to your user
 
 Since we're now using managed identities you will have to assign some roles to your user:
-
-Here's the rewritten version with one Bash block and one PowerShell block, each containing comments for clarity:
 
 ### Bash
 ```bash
@@ -86,5 +82,3 @@ $searchServiceName='Azure Cognitive Search service name'  # Name of your Azure C
 # Assign Search Index Data Reader role
 az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
 ``` 
-
-This approach consolidates all commands into respective Bash and PowerShell blocks while adding comments for clarification.

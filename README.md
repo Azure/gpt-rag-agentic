@@ -9,9 +9,9 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
    - [1.2 Agent Creation and Strategies](#agent-creation-and-strategies)
    - [1.3 Create your Own Agent Strategy](#how-to-add-and-configure-you-own-agent-strategies)
 2. [**Running the Orchestrator**](#running-the-orchestrator)
-   - [2.1 Running the Chat Client Locally](#running-the-chat-client-locally)
-   - [2.2 Running the Function Locally](docs/LOCAL_DEPLOYMENT.md)
-   - [2.3 Cloud Deployment](#cloud-deployment)
+   - [2.1 Cloud Deployment](#cloud-deployment)
+   - [2.2 Running the Chat Client Locally](#running-the-chat-client-locally)
+   - [2.3 Running the Function Locally](docs/LOCAL_DEPLOYMENT.md)
 3. [**NL2SQL Strategies Configuration**](#nl2sql-strategies-configuration)
    - [3.1 Configuring NL2SQL Strategies](#configuring-nl2sql-strategies)
    - [3.2 Data Dictionary and Query samples](#nl2sql-data)
@@ -154,30 +154,6 @@ Ensure the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly se
 
 ## Running the Orchestrator
 
-### Running the Chat Client Locally
-
-1. Set the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable to run the NL2SQL chat client locally:
-
-**Bash:**
-```bash
-export AUTOGEN_ORCHESTRATION_STRATEGY=nl2sql
-```
-
-**PowerShell:**
-```powershell
-$env:AUTOGEN_ORCHESTRATION_STRATEGY = "nl2sql"
-```
-
-2. Rename the `.env.template` file to `.env` and update the variables as needed.
-
-3. Run `./chat.sh` (for Bash) or `./chat.ps1` (for PowerShell) to start the client locally.
-
-![chat client](media/running_chat_client.png)
-
-### Running the Function Locally
-
-To run the Azure Function locally, see [Testing the Solution Locally in VS Code](docs/LOCAL_DEPLOYMENT.md).
-
 ### Cloud Deployment
 
 Deploy the orchestrator to the cloud using the Azure Developer CLI:
@@ -189,6 +165,61 @@ azd deploy
 ```
 
 Ensure prerequisites, like Python 3.11, Azure Developer CLI, and Git, are installed.
+
+### Running the Chat Client Locally
+
+1. Make sure your user has the roles needed to access CosmosDB and AI Search.
+
+### Bash
+```bash
+# Set variables for Cosmos DB role assignment
+resourceGroupName='your resource group name'  # Name of your resource group
+cosmosDbaccountName='CosmosDB Service name'   # Name of your CosmosDB account
+roleDefinitionId='00000000-0000-0000-0000-000000000002'  # Built-in CosmosDB role ID for Data Contributor
+principalId='Object id of your user in Microsoft Entra ID'  # Object ID of the user in Microsoft Entra ID
+
+# Assign CosmosDB Data Contributor role to the user
+az cosmosdb sql role assignment create --account-name $cosmosDbaccountName --resource-group $resourceGroupName --scope "/" --principal-id $principalId --role-definition-id $roleDefinitionId
+
+# Set variables for Azure OpenAI role assignment
+subscriptionId='your subscription id'  # Subscription ID
+
+# Set variables for Cognitive Search role assignment
+searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
+
+# Assign Search Index Data Reader role
+az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
+```
+
+### PowerShell
+```powershell
+# Set variables for Cosmos DB role assignment
+$resourceGroupName='your resource group name'  # Name of your resource group
+$cosmosDbaccountName='CosmosDB Service name'   # Name of your CosmosDB account
+$roleDefinitionId='00000000-0000-0000-0000-000000000002'  # Built-in CosmosDB role ID for Data Contributor
+$principalId='Object id of your user in Microsoft Entra ID'  # Object ID of the user in Microsoft Entra ID
+
+# Assign CosmosDB Data Contributor role to the user
+az cosmosdb sql role assignment create --account-name $cosmosDbaccountName --resource-group $resourceGroupName --scope "/" --principal-id $principalId --role-definition-id $roleDefinitionId
+
+# Set variables for Azure OpenAI role assignment
+$subscriptionId='your subscription id'  # Subscription ID
+
+# Set variables for Cognitive Search role assignment
+$searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
+
+# Assign Search Index Data Reader role
+az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
+``` 
+2. Rename the `.env.template` file to `.env` and update the variables as needed.
+
+3. Run `./chat.sh` (for Bash) or `./chat.ps1` (for PowerShell) to start the client locally.
+
+![chat client](media/running_chat_client.png)
+
+### Running the Function Locally
+
+To run the Azure Function locally, see [Testing the Solution Locally in VS Code](docs/LOCAL_DEPLOYMENT.md).
 
 ---
 
