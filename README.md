@@ -183,6 +183,10 @@ az cosmosdb sql role assignment create --account-name $cosmosDbaccountName --res
 
 # Set variables for Azure OpenAI role assignment
 subscriptionId='your subscription id'  # Subscription ID
+openAIAccountName='Azure OpenAI service name'  # Name of the Azure OpenAI service
+
+# Assign Cognitive Services OpenAI User role
+az role assignment create --role "Cognitive Services OpenAI User" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName
 
 # Set variables for Cognitive Search role assignment
 searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
@@ -204,6 +208,10 @@ az cosmosdb sql role assignment create --account-name $cosmosDbaccountName --res
 
 # Set variables for Azure OpenAI role assignment
 $subscriptionId='your subscription id'  # Subscription ID
+$openAIAccountName='Azure OpenAI service name'  # Name of the Azure OpenAI service
+
+# Assign Cognitive Services OpenAI User role
+az role assignment create --role "Cognitive Services OpenAI User" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName
 
 # Set variables for Cognitive Search role assignment
 $searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
