@@ -8,8 +8,8 @@ check_package_installed() {
 
 # Check if autogen and azure-functions are installed
 echo "🔍 Checking if required packages are installed..."
-if ! check_package_installed "autogen" || ! check_package_installed "asyncio"; then
-    echo "⚠️ Oops! It looks like 'autogen' and/or 'asyncio' are missing."
+if ! check_package_installed "autogen" ; then
+    echo "⚠️ Oops! It looks like 'autogen' is missing."
     echo "💡 Please run 'pip install -r requirements.txt' to install the necessary dependencies."
 else
     echo "✅ All required packages are installed!"
