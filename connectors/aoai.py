@@ -66,20 +66,20 @@ class AzureOpenAIClient:
             retry_after_ms = e.response.headers.get('retry-after-ms')
             if retry_after_ms:
                 retry_after_ms = int(retry_after_ms)
-                logging.info(f"[aoai]get_completion: Reached rate limit, retrying after {retry_after_ms} ms")
+                logging.info(f"[aoai] get_completion: Reached rate limit, retrying after {retry_after_ms} ms")
                 time.sleep(retry_after_ms / 1000)
                 return self.get_completion(self, prompt, retry_after=False)
             else:
-                logging.error(f"[aoai]get_completion: Rate limit error occurred, no 'retry-after-ms' provided: {e}")
+                logging.error(f"[aoai] get_completion: Rate limit error occurred, no 'retry-after-ms' provided: {e}")
                 raise
 
         except Exception as e:
-            logging.error(f"[aoai]get_completion: An unexpected error occurred: {e}")
+            logging.error(f"[aoai] get_completion: An unexpected error occurred: {e}")
             raise
 
     def get_embeddings(self, text, retry_after=True):
         one_liner_text = text.replace('\n', ' ')
-        logging.info(f"[aoai]Getting embeddings for text: {one_liner_text[:100]}")        
+        logging.info(f"[aoai] Getting embeddings for text: {one_liner_text[:100]}")        
         openai_deployment = os.getenv('AZURE_OPENAI_EMBEDDING_DEPLOYMENT')
 
         # summarize in case it is larger than the maximum input tokens
@@ -87,7 +87,7 @@ class AzureOpenAIClient:
         if (num_tokens > MAX_EMBEDDINGS_MODEL_INPUT_TOKENS):
             prompt = f"Rewrite the text to be coherent and meaningful, reducing it to {MAX_EMBEDDINGS_MODEL_INPUT_TOKENS} tokens: {text}"
             text = self.get_completion(prompt)
-            logging.info(f"[aoai]get_embeddings: rewriting text to fit in {MAX_EMBEDDINGS_MODEL_INPUT_TOKENS} tokens")
+            logging.info(f"[aoai] get_embeddings: rewriting text to fit in {MAX_EMBEDDINGS_MODEL_INPUT_TOKENS} tokens")
 
         try:
             response = self.client.embeddings.create(
@@ -101,21 +101,21 @@ class AzureOpenAIClient:
             retry_after_ms = e.response.headers.get('retry-after-ms')
             if retry_after_ms:
                 retry_after_ms = int(retry_after_ms)
-                logging.info(f"[aoai]get_completion: Reached rate limit, retrying after {retry_after_ms} ms")
+                logging.info(f"[aoai ]get_completion: Reached rate limit, retrying after {retry_after_ms} ms")
                 time.sleep(retry_after_ms / 1000)
                 return self.get_completion(self, prompt, retry_after=False)
             else:
-                logging.error(f"[aoai]get_completion: Rate limit error occurred, no 'retry-after-ms' provided: {e}")
+                logging.error(f"[aoai] get_completion: Rate limit error occurred, no 'retry-after-ms' provided: {e}")
                 raise
 
         except Exception as e:
-            logging.error(f"[aoai]get_embedding: An unexpected error occurred: {e}")
+            logging.error(f"[aoai] get_embedding: An unexpected error occurred: {e}")
             raise
 
     def _truncate_input(self, text, max_tokens):
         input_tokens = GptTokenEstimator().estimate_tokens(text)
         if input_tokens > max_tokens:
-            logging.info(f"[aoai]Input size {input_tokens} exceeded maximum token limit {max_tokens}, truncating...")
+            logging.info(f"[aoai] Input size {input_tokens} exceeded maximum token limit {max_tokens}, truncating...")
             step_size = 1  # Initial step size
             iteration = 0  # Iteration counter
 

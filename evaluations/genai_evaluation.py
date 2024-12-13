@@ -3,16 +3,16 @@
 evaluation.py
 
 A script to evaluate questions either by sending them to a REST API or processing them locally
-using the Orchestrator class.
+using the Orchestrator class. Additionally, results are saved to an Excel spreadsheet.
 
 Usage:
     bash:
     export PYTHONPATH=./:$PYTHONPATH
-    python evaluation.py
+    python evaluation.py --test-data path/to/test_data.jsonl
 
     Powershell:
     $env:PYTHONPATH = "./;$env:PYTHONPATH"    
-    python evaluation.py
+    python evaluation.py --test-data path/to/test_data.jsonl
 
     Environment Variables:
     - USE_REST_API: Set to "True" to use the REST API for processing questions. Otherwise, local execution is used.
@@ -43,13 +43,13 @@ import sys
 import json
 import requests
 import datetime
-import time
 import logging
 import logging.config
 from dotenv import load_dotenv
-import pandas as pd
-from promptflow.client import PFClient
 import asyncio
+import argparse
+import pandas as pd  # Import pandas
+import time
 
 # Import Orchestrator for local execution
 try:
@@ -204,9 +204,6 @@ def process_question(question, use_rest_api, orchestrator_endpoint, function_key
     
     return response_data
 
-import os
-import json
-
 def prettify_jsonl_file(input_file):
     # Check if the input file exists
     if not os.path.isfile(input_file):
@@ -231,12 +228,38 @@ def prettify_jsonl_file(input_file):
     except Exception as e:
         print(f"Error occurred while processing the file: {e}")
 
+def parse_arguments():
+    """
+    Parse command-line arguments.
+
+    Returns:
+        Namespace: Parsed arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description="Evaluate questions either by sending them to a REST API or processing them locally."
+    )
+    parser.add_argument(
+        "--test-data",
+        type=str,
+        required=True,
+        help="Path to the test dataset file in JSONL format.",
+    )
+    return parser.parse_args()
 
 def main():
     """
     Main function to execute the evaluation process.
     """
-    print("Starting evaluation process...")
+    args = parse_arguments()
+    data_file_to_use = args.test_data
+
+    # Check if the specified data file exists
+    if not os.path.exists(data_file_to_use):
+        logger.error(f"The specified data file '{data_file_to_use}' does not exist.")
+        sys.exit(1)
+
+    print(f"Using data file: {data_file_to_use}")
+
     load_dotenv()
     current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -245,6 +268,8 @@ def main():
         orchestrator_endpoint, function_key = get_rest_api_config()
         print("Configured to use REST API for processing questions.")
     else:
+        orchestrator_endpoint = None
+        function_key = None
         print("Configured to use local execution for processing questions.")
 
     # Azure configuration (used if needed)
@@ -258,57 +283,32 @@ def main():
     }
     print("Azure configuration loaded.")
 
-    ##################################
-    ## Base Run
-    ##################################
-
-    data_file = "evaluations/test-dataset.jsonl"
-    custom_data_file = "evaluations/test-dataset.custom.jsonl"
-    output_file = f"evaluations/responses_{current_time}.jsonl"
-    print("File paths set.")
-
     # Ensure 'evaluations' directory exists
     os.makedirs('evaluations', exist_ok=True)
     print("Ensured 'evaluations' directory exists.")
 
-    # Determine which data file to use
-    if os.path.exists(custom_data_file):
-        data_file_to_use = custom_data_file
-        print(f"Using custom data file: {custom_data_file}")
-    elif os.path.exists(data_file):
-        data_file_to_use = data_file
-        print(f"Using default data file: {data_file}")
-    else:
-        logger.error("Neither custom_data_file nor data_file exists.")
-        raise FileNotFoundError("Neither custom_data_file nor data_file exists.")
-    print(f"Data file to use: {data_file_to_use}")
-
+    output_jsonl_file = f"evaluations/responses_{current_time}.jsonl"
+    output_excel_file = f"evaluations/responses_{current_time}.xlsx"  # Excel output file
     conversation_id = ""
     last_response_data = None
 
+    # Initialize a list to collect all output data for Excel
+    excel_data = []
+
     # Process each question in the test dataset
-    with open(data_file_to_use, 'r', encoding='utf-8') as f_in, open(output_file, 'w', encoding='utf-8') as f_out:
-        print("Opened data file and output file.")
+    with open(data_file_to_use, 'r', encoding='utf-8') as f_in, open(output_jsonl_file, 'w', encoding='utf-8') as f_out:
+        print("Opened data file and output JSONL file.")
         for line_number, line in enumerate(f_in, start=1):
             line = line.strip()
             if not line:
                 continue
             try:
-                # Attempt to parse the JSON line
                 data = json.loads(line)
                 question = data.get('question', '')
                 ground_truth = data.get('ground_truth', '')
                 print(f"Processing question {line_number}: {question}")
 
-                # Prepare the request payload
-                request_body = {
-                    "conversation_id": conversation_id,
-                    "question": question
-                }
-                
-                # Start timing
                 start_time = time.time()
-
                 # Process the question
                 response_data = process_question(
                     question,
@@ -317,137 +317,37 @@ def main():
                     function_key if use_rest_api else None,
                     conversation_id
                 )
+                duration = time.time() - start_time
 
-                # End timing
-                end_time = time.time()
-                duration = end_time - start_time
+                # Prepare the output data
+                output_data = {
+                    "Question": question,
+                    "Ground Truth": ground_truth,
+                    "Answer": response_data.get('answer', 'No answer provided.'),
+                    "Context": response_data.get('data_points', 'No data points provided.'),
+                    "Thoughts": response_data.get('thoughts', 'No thoughts provided.'),
+                    "Processing Time (seconds)": duration
+                }
+                f_out.write(json.dumps(output_data) + '\n')
 
-                if 'error' in response_data:
-                    error_message = response_data['error']
-                    print(f"Error: {error_message} for question: {question}")
-                    logger.error(f"Error processing question '{question}': {error_message}")
-                    answer = error_message
-                    data_points = ""
-                    thoughts = ""
-                else:
-                    answer = response_data.get('answer', 'No answer provided.')
-                    data_points = response_data.get('data_points', 'No data points provided.')
-                    thoughts = response_data.get('thoughts', 'No thoughts provided.')
-                    reasoning = response_data.get('reasoning', 'No reasoning provided.')
-                    sql_query = response_data.get('sql_query', 'No SQL query provided.')
+                # Append to excel_data list
+                excel_data.append(output_data)
 
-                    # Update conversation_id if present
-                    conversation_id = response_data.get('conversation_id', conversation_id)
-
-                print(f"Processing time for question '{question}': {duration:.2f} seconds")
-
-            except json.JSONDecodeError as e:
-                error_message = f"JSON decoding failed: {e}"
-                print(f"{error_message} for line {line_number}")
-                logger.error(f"{error_message} for line {line_number}")
-                answer = error_message
-                data_points = ""
-                thoughts = ""
-                duration = 0  # Set duration to zero if there's an error
             except Exception as e:
-                error_message = f"Unexpected error: {e}"
-                print(f"{error_message} for question: {question}")
-                logger.exception(f"{error_message} for question: {question}")
-                answer = error_message
-                data_points = ""
-                thoughts = ""
-                duration = 0  # Set duration to zero if there's an error
-
-            # Prepare and write the output JSON
-            output_data = {
-                "question": question,
-                "ground_truth": ground_truth,
-                "answer": answer,
-                "context": data_points,
-                "thoughts": thoughts,
-                "reasoning": reasoning,
-                "sql_query": sql_query,                
-                "processing_time_seconds": f"{duration:.2f}"  # Include processing time
-            }
-            f_out.write(json.dumps(output_data) + '\n')
+                logger.exception(f"Error processing line {line_number}: {e}")
 
     print("Finished processing all questions.")
+    # Optionally prettify the JSONL file
+    prettify_jsonl_file(output_jsonl_file)
 
-    ##################################
-    ## Evaluation Run
-    ##################################
-
+    # Save results to Excel
     try:
-        pf = PFClient()
+        df = pd.DataFrame(excel_data)
+        df.to_excel(output_excel_file, index=False)
+        print(f"Results have been saved to Excel file: '{output_excel_file}'")
     except Exception as e:
-        logger.exception(f"Failed to initialize PFClient: {e}")
-        print("Failed to initialize PromptFlow client.")
-        sys.exit(1)
-
-    eval_prompty = "evaluations/genai-score-eval.prompty"
-    print("Starting evaluation run...")
-    try:
-        eval_run = pf.run(
-            flow=eval_prompty,
-            data=output_file,  
-            column_mapping={
-                "question": "${data.question}",
-                "answer": "${data.answer}",
-                "ground_truth": "${data.ground_truth}",
-                "context": "${data.context}",
-                "reasoning":  "${data.reasoning}",
-                "sql_query":  "${data.sql_query}",
-                "group_chat":  "${data.thoughts}"
-            },
-            stream=True,
-        )
-        print("Evaluation run completed.")
-    except Exception as e:
-        logger.exception(f"Failed during evaluation run: {e}")
-        print("Failed during evaluation run.")
-        sys.exit(1)
-
-    try:
-        details = pf.get_details(eval_run)
-        print("Retrieved evaluation details.")
-    except Exception as e:
-        logger.exception(f"Failed to retrieve evaluation details: {e}")
-        print("Failed to retrieve evaluation details.")
-        sys.exit(1)
-
-    try:
-        # Compute the averages of outputs.similarity_score and outputs.groundedness_score
-        average_score = details['outputs.similarity_score'].mean()
-        average_groundedness_score = details['outputs.groundedness_score'].mean()
-
-        # Create a new row with averages
-        average_row = {}
-        for col in details.columns:
-            if col == 'inputs.question':
-                average_row[col] = 'Average'
-            elif col == 'outputs.similarity_score':
-                average_row[col] = average_score
-            elif col == 'outputs.groundedness_score':
-                average_row[col] = average_groundedness_score
-            else:
-                average_row[col] = ''
-
-        # Append the new row to the DataFrame
-        average_df = pd.DataFrame([average_row])
-        details = pd.concat([details, average_df], ignore_index=True)
-
-        # Save output to an Excel file 
-        filename = f"evaluations/genai-score-eval_{current_time}.xlsx"
-        details.to_excel(filename, index=False)
-        print(f"Saved evaluation details to Excel file: {filename}")
-    except Exception as e:
-        logger.exception(f"Failed to process evaluation details: {e}")
-        print("Failed to process evaluation details.")
-        sys.exit(1)
-
-    # Prettify the JSONL file by formatting it with proper indentation and overwriting the original file
-    prettify_jsonl_file(output_file)
-
+        logger.exception(f"Failed to save results to Excel: {e}")
+        print(f"Error: Could not save results to Excel file. {e}")
 
 if __name__ == '__main__':
     try:
