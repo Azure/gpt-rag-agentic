@@ -3,16 +3,16 @@
 evaluation.py
 
 A script to evaluate questions either by sending them to a REST API or processing them locally
-using the Orchestrator class.
+using the Orchestrator class. Additionally, results are saved to an Excel spreadsheet.
 
 Usage:
     bash:
     export PYTHONPATH=./:$PYTHONPATH
-    python evaluation.py
+    python evaluation.py --test-data path/to/test_data.jsonl
 
     Powershell:
     $env:PYTHONPATH = "./;$env:PYTHONPATH"    
-    python evaluation.py
+    python evaluation.py --test-data path/to/test_data.jsonl
 
     Environment Variables:
     - USE_REST_API: Set to "True" to use the REST API for processing questions. Otherwise, local execution is used.
@@ -48,6 +48,8 @@ import logging.config
 from dotenv import load_dotenv
 import asyncio
 import argparse
+import pandas as pd  # Import pandas
+import time
 
 # Import Orchestrator for local execution
 try:
@@ -202,9 +204,6 @@ def process_question(question, use_rest_api, orchestrator_endpoint, function_key
     
     return response_data
 
-import os
-import json
-
 def prettify_jsonl_file(input_file):
     # Check if the input file exists
     if not os.path.isfile(input_file):
@@ -269,6 +268,8 @@ def main():
         orchestrator_endpoint, function_key = get_rest_api_config()
         print("Configured to use REST API for processing questions.")
     else:
+        orchestrator_endpoint = None
+        function_key = None
         print("Configured to use local execution for processing questions.")
 
     # Azure configuration (used if needed)
@@ -286,13 +287,17 @@ def main():
     os.makedirs('evaluations', exist_ok=True)
     print("Ensured 'evaluations' directory exists.")
 
-    output_file = f"evaluations/responses_{current_time}.jsonl"
+    output_jsonl_file = f"evaluations/responses_{current_time}.jsonl"
+    output_excel_file = f"evaluations/responses_{current_time}.xlsx"  # Excel output file
     conversation_id = ""
     last_response_data = None
 
+    # Initialize a list to collect all output data for Excel
+    excel_data = []
+
     # Process each question in the test dataset
-    with open(data_file_to_use, 'r', encoding='utf-8') as f_in, open(output_file, 'w', encoding='utf-8') as f_out:
-        print("Opened data file and output file.")
+    with open(data_file_to_use, 'r', encoding='utf-8') as f_in, open(output_jsonl_file, 'w', encoding='utf-8') as f_out:
+        print("Opened data file and output JSONL file.")
         for line_number, line in enumerate(f_in, start=1):
             line = line.strip()
             if not line:
@@ -303,6 +308,7 @@ def main():
                 ground_truth = data.get('ground_truth', '')
                 print(f"Processing question {line_number}: {question}")
 
+                start_time = time.time()
                 # Process the question
                 response_data = process_question(
                     question,
@@ -311,23 +317,37 @@ def main():
                     function_key if use_rest_api else None,
                     conversation_id
                 )
+                duration = time.time() - start_time
 
                 # Prepare the output data
                 output_data = {
-                    "question": question,
-                    "ground_truth": ground_truth,
-                    "answer": response_data.get('answer', 'No answer provided.'),
-                    "context": response_data.get('data_points', 'No data points provided.'),
-                    "thoughts": response_data.get('thoughts', 'No thoughts provided.'),
-                    "processing_time_seconds": response_data.get('duration', 0)
+                    "Question": question,
+                    "Ground Truth": ground_truth,
+                    "Answer": response_data.get('answer', 'No answer provided.'),
+                    "Context": response_data.get('data_points', 'No data points provided.'),
+                    "Thoughts": response_data.get('thoughts', 'No thoughts provided.'),
+                    "Processing Time (seconds)": duration
                 }
                 f_out.write(json.dumps(output_data) + '\n')
+
+                # Append to excel_data list
+                excel_data.append(output_data)
+
             except Exception as e:
                 logger.exception(f"Error processing line {line_number}: {e}")
 
     print("Finished processing all questions.")
     # Optionally prettify the JSONL file
-    prettify_jsonl_file(output_file)
+    prettify_jsonl_file(output_jsonl_file)
+
+    # Save results to Excel
+    try:
+        df = pd.DataFrame(excel_data)
+        df.to_excel(output_excel_file, index=False)
+        print(f"Results have been saved to Excel file: '{output_excel_file}'")
+    except Exception as e:
+        logger.exception(f"Failed to save results to Excel: {e}")
+        print(f"Error: Could not save results to Excel file. {e}")
 
 if __name__ == '__main__':
     try:
