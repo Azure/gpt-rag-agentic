@@ -29,7 +29,7 @@ DATA_DIR="$SCRIPT_DIR"
 echo "🔍 Searching for .jsonl files in: $DATA_DIR"
 
 # Find all .jsonl files directly inside DATA_DIR without descending into subdirectories
-mapfile -t jsonl_files < <(find "$DATA_DIR" -maxdepth 1 -type f \( -iname "*.jsonl" \))
+mapfile -t jsonl_files < <(find "$DATA_DIR" -maxdepth 1 -type f \( -iname "test-*.jsonl" \))
 
 # Check if any .jsonl files are found
 if [ ${#jsonl_files[@]} -eq 0 ]; then

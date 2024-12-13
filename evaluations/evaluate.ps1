@@ -43,7 +43,7 @@ $dataDir = $scriptDir
 Write-Host "🔍 Searching for .jsonl files in: $dataDir" -ForegroundColor $colorInfo
 
 # Find all .jsonl files directly inside DATA_DIR without descending into subdirectories
-$jsonlFiles = Get-ChildItem -Path $dataDir -Filter *.jsonl -File
+$jsonlFiles = Get-ChildItem -Path $dataDir -Filter *.jsonl -File | Where-Object { $_.Name -like "test-*.jsonl" }
 
 # Check if any .jsonl files are found
 if ($jsonlFiles.Count -eq 0) {
