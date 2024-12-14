@@ -15,7 +15,8 @@ __*/*
 *.custom.*
 .vscode/*
 output.log
-responses*.jsonl
+responses_*.jsonl
+responses_*.xslx
 
 # Evaluations
 qa_flow_quality_eval.jsonl
