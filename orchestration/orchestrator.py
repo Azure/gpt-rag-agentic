@@ -118,7 +118,6 @@ class Orchestrator:
             dict: A dictionary containing the conversation details, including the final answer and thought process.
         """
         try:
-             # TODO: SEE HOW TO SEND THE PRINCIPAL ID TO THE RETRIEVAL FUNCITON, TALVEZ UMA NOVA TOOL que recupere essa informacao de algum lugar!!!
             logging.info(f"[orchestrator] {self.short_id} Creating group chat.")
             agents = agent_configuration["agents"]
             groupchat = autogen.GroupChat(
