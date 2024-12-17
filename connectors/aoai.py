@@ -3,7 +3,7 @@ import os
 import tiktoken
 import time
 from openai import AzureOpenAI, RateLimitError
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential, get_bearer_token_provider
 
 MAX_RETRIES = 10 # Maximum number of retries for rate limit errors
 MAX_EMBEDDINGS_MODEL_INPUT_TOKENS = 8192
@@ -26,7 +26,10 @@ class AzureOpenAIClient:
         self.openai_api_version = os.getenv('AZURE_OPENAI_API_VERSION')
 
         token_provider = get_bearer_token_provider(
-            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+            ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            ), "https://cognitiveservices.azure.com/.default"
         )
 
         self.client = AzureOpenAI(

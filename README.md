@@ -189,7 +189,7 @@ openAIAccountName='Azure OpenAI service name'  # Name of the Azure OpenAI servic
 az role assignment create --role "Cognitive Services OpenAI User" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName
 
 # Set variables for Cognitive Search role assignment
-searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
+searchServiceName='Azure Cognitive Search service name'  # Name of your Azure AI Search service
 
 # Assign Search Index Data Reader role
 az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
@@ -214,7 +214,7 @@ $openAIAccountName='Azure OpenAI service name'  # Name of the Azure OpenAI servi
 az role assignment create --role "Cognitive Services OpenAI User" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.CognitiveServices/accounts/$openAIAccountName
 
 # Set variables for Cognitive Search role assignment
-$searchServiceName='Azure Cognitive Search service name'  # Name of your Azure Cognitive Search service
+$searchServiceName='Azure Cognitive Search service name'  # Name of your Azure AI Search service
 
 # Assign Search Index Data Reader role
 az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName

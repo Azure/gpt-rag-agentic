@@ -1,8 +1,3 @@
-import logging
-import struct
-import os
-import pyodbc
-from azure.identity import DefaultAzureCredential
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from .nl2sql_base_agent_strategy import NL2SQLBaseStrategy
 from ..constants import NL2SQL_ADVISOR
