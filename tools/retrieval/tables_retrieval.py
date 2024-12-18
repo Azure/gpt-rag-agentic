@@ -1,7 +1,7 @@
 from typing import List, Dict
 from typing_extensions import Annotated
 from connectors import AzureOpenAIClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 import os
 import time
 import logging
@@ -40,7 +40,10 @@ def tables_retrieval(
     search_results: List[Dict[str, str]] = []
     search_query = input
     try:
-        credential = DefaultAzureCredential()
+        credential = ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            )
         start_time = time.time()
         logging.info(f"[ai_search] Generating question embeddings. Search query: {search_query}")
         embeddings_query = aoai.get_embeddings(search_query)
