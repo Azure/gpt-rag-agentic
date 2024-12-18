@@ -1,6 +1,6 @@
 import os
 import logging
-from azure.identity.aio import DefaultAzureCredential as AsyncDefaultAzureCredential
+from azure.identity.aio import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from azure.keyvault.secrets.aio import SecretClient as AsyncSecretClient
 from azure.core.exceptions import ResourceNotFoundError, ClientAuthenticationError
 
@@ -12,7 +12,10 @@ async def get_secret(secretName):
     try:
         keyVaultName = os.environ["AZURE_KEY_VAULT_NAME"]
         KVUri = f"https://{keyVaultName}.vault.azure.net"
-        async with AsyncDefaultAzureCredential() as credential:
+        async with ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            ) as credential:
             async with AsyncSecretClient(vault_url=KVUri, credential=credential) as client:
                 retrieved_secret = await client.get_secret(secretName)
                 value = retrieved_secret.value

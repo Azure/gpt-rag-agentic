@@ -1,6 +1,6 @@
 from typing_extensions import Annotated
 from connectors import AzureOpenAIClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 import os
 import time
 import logging
@@ -27,7 +27,10 @@ def vector_index_retrieve(
     search_results = []
     search_query = input
     try:
-        credential = DefaultAzureCredential()
+        credential = ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            )
         start_time = time.time()
         logging.info(f"[ai_search] generating question embeddings. search query: {search_query}")
         embeddings_query = aoai.get_embeddings(search_query)

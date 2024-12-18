@@ -3,7 +3,7 @@ import logging
 import pyodbc
 import struct
 import teradatasql 
-from azure.identity import DefaultAzureCredential
+from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from .keyvault import get_secret
 
 class SQLDBClient:
@@ -49,7 +49,10 @@ class SQLDBClient:
                 raise
         else:
             # Use Azure AD token for authentication
-            credential = DefaultAzureCredential()
+            credential = ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            )
             token_bytes = credential.get_token("https://database.windows.net/.default").token.encode("UTF-16-LE")
             token_struct = struct.pack(f'<I{len(token_bytes)}s', len(token_bytes), token_bytes)
             logging.info("Using Azure AD token authentication.")
@@ -71,8 +74,11 @@ class SQLDBClient:
         uid = None
         pwd = None
 
-        # Obtain token using DefaultAzureCredential
-        credential = DefaultAzureCredential()
+        # Obtain token using Azure Credential
+        credential = ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            )
         token_bytes = credential.get_token("https://database.windows.net/.default").token.encode("UTF-16-LE")
         token_struct = struct.pack(f'<I{len(token_bytes)}s', len(token_bytes), token_bytes)
         connection_string = (

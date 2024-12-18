@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from azure.cosmos.aio import CosmosClient
-from azure.identity.aio import DefaultAzureCredential
+from azure.identity.aio import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 
 MAX_RETRIES = 10  # Maximum number of retries for rate limit errors
 
@@ -33,7 +33,10 @@ class CosmosDBClient:
 # self.history = self.conversation_data.get('history', [])
 
     async def get_document(self, container, key) -> dict: 
-        async with DefaultAzureCredential() as credential:    
+        async with ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            ) as credential:    
             async with CosmosClient(self.db_uri, credential=credential) as db_client:
                 db = db_client.get_database_client(database=self.db_name)
                 container = db.get_container_client(container)
@@ -46,7 +49,10 @@ class CosmosDBClient:
                 return document
 
     async def create_document(self, container, key) -> dict: 
-        async with DefaultAzureCredential() as credential:    
+        async with ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            ) as credential:    
             async with CosmosClient(self.db_uri, credential=credential) as db_client:
                 db = db_client.get_database_client(database=self.db_name)
                 container = db.get_container_client(container)
@@ -59,7 +65,10 @@ class CosmosDBClient:
                 return document
             
     async def update_document(self, container, document) -> dict: 
-        async with DefaultAzureCredential() as credential:    
+        async with ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            ) as credential:    
             async with CosmosClient(self.db_uri, credential=credential) as db_client:
                 db = db_client.get_database_client(database=self.db_name)
                 container = db.get_container_client(container)
