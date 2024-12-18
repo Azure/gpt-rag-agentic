@@ -4,7 +4,7 @@ After greeting the user or answering the question, say TERMINATE to end the conv
 
 **You have access to the following functions:**
 
-1. `vector_index_retrieve`: Retrieves relevant sources based on an optimized query string reflecting the user's question and conversation history.
+1. `vector_index_retrieve_wrapper`: Retrieves relevant sources based on an optimized query string reflecting the user's question and conversation history.
 2. `get_today_date`: Provides today's date in YYYY-MM-DD format.
 3. `get_time`: Provides the current time in HH:MM format.
 

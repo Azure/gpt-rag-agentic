@@ -7,17 +7,18 @@ import logging
 import requests
 
 def vector_index_retrieve(
-    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
+    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
+    security_ids: str = 'anonymous'
 ) -> Annotated[str, "The output is a string with the search results"]:
     aoai = AzureOpenAIClient()
 
     search_top_k = os.getenv('AZURE_SEARCH_TOP_K', 3)
     search_approach = os.getenv('AZURE_SEARCH_APPROACH', 'hybrid')
-    use_semantic = os.getenv('AZURE_SEARCH_USE_SEMANTIC', False)
     semantic_search_config = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG', 'my-semantic-config')
     search_service = os.getenv('AZURE_SEARCH_SERVICE')
     search_index = os.getenv('AZURE_SEARCH_INDEX', 'ragindex')	
     search_api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2024-07-01')
+    use_semantic = os.getenv('AZURE_SEARCH_USE_SEMANTIC', 'false').lower() == 'true'
 
     VECTOR_SEARCH_APPROACH = 'vector'
     TERM_SEARCH_APPROACH = 'term'
@@ -62,6 +63,14 @@ def vector_index_retrieve(
         if use_semantic == "true" and search_approach != VECTOR_SEARCH_APPROACH:
             body["queryType"] = "semantic"
             body["semanticConfiguration"] = semantic_search_config
+
+        filter_str = (
+            f"metadata_security_id/any(g:search.in(g, '{security_ids}')) "
+            f"or not metadata_security_id/any()"
+        )
+        body["filter"] = filter_str
+
+        logging.debug(f"[ai_search] search filter: {filter_str}")
 
         headers = {
             'Content-Type': 'application/json',

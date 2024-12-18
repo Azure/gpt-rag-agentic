@@ -104,7 +104,7 @@ class Orchestrator:
             list: A list of agent configurations.
         """
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
-        return self.agent_strategy.create_agents(self.llm_config, history)
+        return self.agent_strategy.create_agents(self.llm_config, history, self.client_principal)
 
     async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
         """

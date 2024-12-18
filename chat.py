@@ -139,9 +139,11 @@ def send_question_to_python(question, conversation_id):
     """
     # Use default client principal information
     client_principal = {
-        'id': '00000000-0000-0000-0000-000000000000',
-        'name': 'anonymous'
+        'id': '00000000-0000-0000-0000-000000000123',
+        'name': 'anonymous',
+        'group_names': ''        
     }
+
 
     # Call orchestrator
     if question:
