@@ -8,7 +8,7 @@ class BaseAgentStrategy:
     def __init__(self):
         pass
 
-    def create_agents(self, llm_config, history):
+    def create_agents(self, llm_config, history, client_principal=None):
         raise NotImplementedError("This method should be overridden in subclasses.")
 
     def _read_prompt(self, agent_name, placeholders=None):
@@ -135,3 +135,10 @@ class BaseAgentStrategy:
             conversation_summary = "The conversation just started."
         logging.info(f"[base_agent_strategy] Conversation summary: {conversation_summary[:200]}")
         return conversation_summary
+    
+    def _generate_security_ids(self, client_principal):
+        security_ids = 'anonymous'
+        if client_principal is not None:
+            group_names = client_principal['group_names']
+            security_ids = f"{client_principal['id']}" + (f",{group_names}" if group_names else "")
+        return security_ids

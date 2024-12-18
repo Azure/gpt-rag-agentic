@@ -9,6 +9,20 @@ check_package_installed() {
     return $?
 }
 
+# Function to check if the user is logged in to Azure
+check_azure_login() {
+    if ! az account show > /dev/null 2>&1; then
+        echo "⚠️ You are not logged into Azure. Please run 'az login' to log in."
+        exit 1
+    else
+        echo "✅ You are logged into Azure."
+    fi
+}
+
+# Check if the user is logged into Azure
+echo "🔍 Verifying Azure login status..."
+check_azure_login
+
 # Check if 'autogen' is installed
 echo "🔍 Checking if required packages are installed..."
 if ! check_package_installed "autogen"; then

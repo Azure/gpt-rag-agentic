@@ -7,10 +7,25 @@ function Check-PackageInstalled {
     return $package -notlike "*WARNING: Package(s) not found*"
 }
 
+# Function to check if the user is logged into Azure
+function Check-AzureLogin {
+    $account = az account show 2>&1
+    if ($account -like "*Please run 'az login'*") {
+        Write-Host "⚠️ You are not logged into Azure. Please run 'az login' to log in." -ForegroundColor Yellow
+        exit 1
+    } else {
+        Write-Host "✅ You are logged into Azure." -ForegroundColor Green
+    }
+}
+
 # Colors for different messages
 $colorInfo = "Cyan"
 $colorWarning = "Yellow"
 $colorSuccess = "Green"
+
+# Check if the user is logged into Azure
+Write-Host "🔍 Verifying Azure login status..." -ForegroundColor $colorInfo
+Check-AzureLogin
 
 $packagesMissing = $false
 

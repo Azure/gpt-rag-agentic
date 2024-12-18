@@ -30,7 +30,7 @@ class NL2SQLAdvisorStrategy(NL2SQLBaseStrategy):
     def send_introductions(self):
         return True
 
-    def create_agents(self, llm_config, history):
+    def create_agents(self, llm_config, history, client_principal=None):
         """
         Creates agents and registers functions for the NL2SQL dual agent scenario.
         """

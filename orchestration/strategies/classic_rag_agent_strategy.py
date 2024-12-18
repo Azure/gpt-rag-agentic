@@ -2,6 +2,7 @@ import logging
 
 from autogen import UserProxyAgent, AssistantAgent, register_function
 from tools import vector_index_retrieve, get_today_date, get_time
+from typing_extensions import Annotated
 
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import CLASSIC_RAG
@@ -22,7 +23,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         return False
     
 
-    def create_agents(self, llm_config, history):
+    def create_agents(self, llm_config, history, client_principal=None):
         """
         Classic RAG creation strategy that creates the basic agents and registers functions.
         
@@ -63,9 +64,25 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
             llm_config=llm_config
         )
 
+    
+        # function closure for vector_index_retrieve
+        def vector_index_retrieve_wrapper(
+                  input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
+        ) -> Annotated[str, "The output is a string with the search results"]:
+            return vector_index_retrieve(input, self._generate_security_ids(client_principal))
+
+        register_function(
+            vector_index_retrieve_wrapper,
+            caller=assistant,
+            executor=user_proxy,
+            name="vector_index_retrieve_wrapper",
+            description="Search the knowledge base for sources to ground and give context to answer a user question."
+        )
+
+
         # Register functions
         register_function(
-            vector_index_retrieve,
+            vector_index_retrieve_wrapper,
             caller=assistant,
             executor=user_proxy,
             name="vector_index_retrieve", 

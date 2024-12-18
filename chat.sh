@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Function to check if the user is logged in to Azure
+check_azure_login() {
+    if ! az account show > /dev/null 2>&1; then
+        echo "⚠️ You are not logged into Azure. Please run 'az login' to log in."
+        exit 1
+    else
+        echo "✅ You are logged into Azure."
+    fi
+}
+
+# Check if the user is logged into Azure
+echo "🔍 Verifying Azure login status..."
+check_azure_login
+
 # Function to check if a package is installed
 check_package_installed() {
     pip show "$1" > /dev/null 2>&1

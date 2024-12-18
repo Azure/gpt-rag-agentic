@@ -68,7 +68,7 @@ class NL2SQLBaseStrategy(BaseAgentStrategy, ABC):
         pass
     
     @abstractmethod
-    def create_agents(self, llm_config, history):
+    def create_agents(self, llm_config, history, client_principal=None):
         pass
 
     # Helper methods that can be used by subclasses

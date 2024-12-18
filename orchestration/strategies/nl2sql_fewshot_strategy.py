@@ -29,7 +29,7 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
     def send_introductions(self):
         return False
 
-    def create_agents(self, llm_config, history):
+    def create_agents(self, llm_config, history, client_principal=None):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """
