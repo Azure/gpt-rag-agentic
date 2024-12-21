@@ -44,7 +44,7 @@ The program relies on several environment variables for configuration. You need 
 - `AZURE_OPENAI_API_VERSION`: API version (default is `'2024-02-01'`).
 - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key.
 - `AZURE_OPENAI_CHAT_DEPLOYMENT`: Deployment name for chat models (default is `'chat'`).
-- `AZURE_OPENAI_EMBEDDING_MODEL`: Embedding model name (default is `'text-embedding-ada-002'`).
+- `AZURE_OPENAI_EMBEDDING_MODEL`: Embedding model name (default is `'text-embedding-3-large'`).
 - `ORCHESTRATOR_ENDPOINT`: The endpoint URL of your GPT-RAG Orchestrator (default is `'http://localhost:7071/api/orc'`).
 - `FUNCTION_KEY`: The function key for authenticating requests to the orchestrator (e.g., `'1234567890'`).
 
