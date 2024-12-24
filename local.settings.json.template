@@ -12,7 +12,7 @@
 
     "AZURE_OPENAI_RESOURCE" : "oai0-[random_sufix]",
     "AZURE_OPENAI_CHATGPT_DEPLOYMENT": "chat",
-    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "text-embedding-ada-002",
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "text-embedding",
     "AZURE_OPENAI_API_VERSION": "2024-03-01-preview",
     "AZURE_OPENAI_MAX_TOKENS": "1000",
 
