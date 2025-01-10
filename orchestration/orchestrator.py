@@ -230,7 +230,8 @@ class Orchestrator:
                     "api_type": "azure",
                     "api_version": self.api_version,
                     "max_tokens": self.max_tokens,
-                    "azure_ad_token_provider": "DEFAULT"
+                    "azure_ad_token_provider": "DEFAULT",
+                    "price": [0.0025, 0.01] # GPT-4o-2024-1120 Global 
                 }
             ],
             "cache_seed": None  # Workaround for running in Azure Functions (read-only filesystem)

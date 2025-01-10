@@ -88,10 +88,7 @@ def vector_index_retrieve(
         text = response.text
         json =response.json()    
         if status_code >= 400:
-            error_message = f'Status code: {status_code}.'
-            if text != "":
-                error_message += f" Error: {text}."
-            logging.error(f"[ai_search] error {status_code} when searching documents. {error_message}")
+            logging.error(f"[multimodal_retrieve] error {response.status_code}: {response.text}")
         else:
             if json['value']:
                 logging.info(f"[ai_search] {len(json['value'])} documents retrieved")
@@ -110,3 +107,107 @@ def vector_index_retrieve(
     sources =  ' '.join(search_results)
     return sources
 
+def replace_image_filenames_with_urls(content: str, related_images: list) -> str:
+    """
+    Replace image filenames in the content string with their corresponding URLs from the related_images list.
+    """
+    for image_url in related_images:
+        # Extract the filename from the URL
+        image_filename = image_url.split('/')[-1]
+        # Replace occurrences of the filename in the content with the URL
+        content = content.replace(image_filename, image_url)
+    return content
+
+def multimodal_vector_index_retrieve(
+    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
+    security_ids: str = 'anonymous'
+) -> Annotated[str, "The output is a string with the search results containing retrieved documents including text and images"]:
+    """
+    Variation of vector_index_retrieve that fetches text + related images from the search index
+    """
+    aoai = AzureOpenAIClient()
+
+    # Acquire your environment variables
+    search_top_k = int(os.getenv('AZURE_SEARCH_TOP_K', 3))
+    search_approach = os.getenv('AZURE_SEARCH_APPROACH', 'vector')  # or 'hybrid'
+    semantic_search_config = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG', 'my-semantic-config')
+    search_service = os.getenv('AZURE_SEARCH_SERVICE')
+    search_index = os.getenv('AZURE_SEARCH_INDEX', 'ragindex')	
+    search_api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2024-07-01')
+    use_semantic = (os.getenv('AZURE_SEARCH_USE_SEMANTIC', 'false').lower() == 'true')
+
+    logging.info(f"[multimodal_retrieve] user input: {input}")
+
+    # 1. Generate embeddings for the user query
+    start_time = time.time()
+    embeddings_query = aoai.get_embeddings(input)
+    embedding_time = round(time.time() - start_time, 2)
+    logging.info(f"[multimodal_retrieve] Query embeddings took {embedding_time} seconds")
+
+    # Prepare authentication
+    credential = ChainedTokenCredential(ManagedIdentityCredential(), AzureCliCredential())
+    azure_search_token = credential.get_token("https://search.azure.com/.default").token
+
+    # 2. Create the request body
+    body = {
+        "select": "title, content, filepath, relatedImages",
+        "top": search_top_k,
+        "vectorQueries": [
+            {
+                "kind": "vector",
+                "vector": embeddings_query,
+                "fields": "contentVector",
+                "k": int(search_top_k)
+            },
+            {
+                "kind": "vector",
+                "vector": embeddings_query,
+                "fields": "captionVector",
+                "k": int(search_top_k)
+            }
+        ]
+    }
+
+    # If you want semantic search layering on top of vector, adjust below
+    if use_semantic and search_approach != "vector":
+        body["queryType"] = "semantic"
+        body["semanticConfiguration"] = semantic_search_config
+
+    # Restrict results by security filters (if any).
+    filter_str = (
+        f"metadata_security_id/any(g:search.in(g, '{security_ids}')) "
+        "or not metadata_security_id/any()"
+    )
+    body["filter"] = filter_str
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {azure_search_token}'
+    }
+
+    search_url = (
+        f"https://{search_service}.search.windows.net"
+        f"/indexes/{search_index}/docs/search"
+        f"?api-version={search_api_version}"
+    )
+
+    search_results = []
+    try:
+        start_time = time.time()
+        resp = requests.post(search_url, headers=headers, json=body)
+        response_time = round(time.time() - start_time, 2)
+        logging.info(f"[multimodal_retrieve] Finished querying Azure AI search. {response_time} seconds")
+        
+        if resp.status_code >= 400:
+            logging.error(f"[multimodal_retrieve] error {resp.status_code}: {resp.text}")
+        else:
+            json_data = resp.json()
+            for doc in json_data.get('value', []):
+                doc['content'] = replace_image_filenames_with_urls(doc['content'], doc.get('relatedImages', []))
+                search_results.append(doc['filepath'] + ": " + doc['content'].strip() + "\n")
+    except Exception as e:
+        logging.error(f"[multimodal_retrieve] Exception in retrieval: {e}")
+
+    # Return a JSON string
+    sources = ' '.join(search_results)
+    return sources

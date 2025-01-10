@@ -16,12 +16,15 @@ openai==1.55.3
 
 # GenAI dependencies
 
-# for 0.4
-# autogen-agentchat==0.4.0.dev3
+# for 0.2 (official)
+autogen-agentchat~=0.2
 
-# for 0.2:
-flaml==2.2.0
-autogen==0.3.0
+# for 0.4 (dev)
+# autogen-agentchat==0.4.0.dev13
+
+# for 0.2 (AG2):
+# flaml==2.2.0
+# autogen==0.3.0
 
 aiohttp==3.10.5
 # asyncio==3.4.3
