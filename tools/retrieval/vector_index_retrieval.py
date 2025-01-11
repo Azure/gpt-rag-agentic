@@ -6,7 +6,7 @@ import time
 import logging
 import requests
 
-def vector_index_retrieve(
+async def vector_index_retrieve(
     input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
     security_ids: str = 'anonymous'
 ) -> Annotated[str, "The output is a string with the search results"]:
@@ -118,7 +118,7 @@ def replace_image_filenames_with_urls(content: str, related_images: list) -> str
         content = content.replace(image_filename, image_url)
     return content
 
-def multimodal_vector_index_retrieve(
+async def multimodal_vector_index_retrieve(
     input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
     security_ids: str = 'anonymous'
 ) -> Annotated[str, "The output is a string with the search results containing retrieved documents including text and images"]:

@@ -56,8 +56,8 @@ class AzureOpenAIClient:
             response = self.client.chat.completions.create(
                 messages=input_messages,
                 model=openai_deployment,
-                temperature=0.7,
-                top_p=0.95,
+                temperature=float(os.environ.get('AZURE_OPENAI_TEMPERATURE', 0.7)),
+                top_p=float(os.environ.get('AZURE_OPENAI_TOP_P', 0.95)),
                 max_tokens=max_tokens
             )
 

@@ -13,9 +13,9 @@
     "AZURE_OPENAI_ENDPOINT": "Your Azure OpenAI endpoint URL.",
     "AZURE_OPENAI_API_VERSION": "2024-10-21",
     "AZURE_OPENAI_API_KEY": "Your Azure OpenAI API key.",
-    "AZURE_OPENAI_CHAT_DEPLOYMENT": "chat",
     "AZURE_OPENAI_EMBEDDING_MODEL": "text-embedding-3-large",
     "AZURE_OPENAI_RESOURCE": "Your Azure OpenAI Resource.",
+    "AZURE_OPENAI_CHATGPT_MODEL": "gpt-4o",
     "AZURE_OPENAI_CHATGPT_DEPLOYMENT": "chat",
     "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "text-embedding",
     "AZURE_OPENAI_MAX_TOKENS": "1000",
@@ -36,6 +36,9 @@
     "AZURE_SEARCH_SERVICE": "Your Azure Search Service.",
     "AZURE_SEARCH_INDEX": "ragindex",
     "AZURE_SEARCH_API_VERSION": "2024-07-01",
+    
+    "AZURE_STORAGE_ACCOUNT": "You Azure Storage Account",
+    "AZURE_STORAGE_CONTAINER: "documents",
 
     "SQL_DATABASE_SERVER": "Your SQL Database Server URL.",
     "SQL_DATABASE_NAME": "Your SQL Database Name.",
