@@ -1,84 +1,56 @@
-# /orchestration/strategies/multimodal_agent_strategy.py
-import logging
-import json
 from typing_extensions import Annotated
-from autogen import UserProxyAgent, register_function
-from autogen.agentchat.contrib.multimodal_conversable_agent import MultimodalConversableAgent
 
-from ..constants import MULTIMODAL_RAG  # or define a new constant
+from tools import get_time, get_today_date, multimodal_vector_index_retrieve
 from .base_agent_strategy import BaseAgentStrategy
-from tools import multimodal_vector_index_retrieve, get_today_date, get_time
+from ..constants import MULTIMODAL_RAG
+from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 
 class MultimodalAgent(BaseAgentStrategy):
     def __init__(self):
         super().__init__()
         self.strategy_type =  MULTIMODAL_RAG
 
-    @property
-    def max_rounds(self):
-        return 8
+    async def create_agents(self, history, client_principal=None):
+        """
+        Classic RAG creation strategy that creates the basic agents and registers functions.
+        
+        Parameters:
+        - history: The conversation history, which will be summarized to provide context for the assistant's responses.
+        
+        Returns:
+        - agent_configuration: A dictionary that includes the agents team, default model client, termination conditions and selector function.
 
-    @property
-    def send_introductions(self):
-        return False
+        Note:
+        To use a different model for an specific agent, instantiate a separate AzureOpenAIChatCompletionClient and assign it instead of using self._get_model_client().
+        """
 
-    def create_agents(self, llm_config, history, client_principal=None):
-        # 1. Create a user proxy
-        user_proxy_prompt = self._read_prompt("user_proxy")  # or a custom prompt
-        user_proxy = UserProxyAgent(
-            name="user",
-            system_message=user_proxy_prompt,
-            human_input_mode="NEVER",
-        )
+        # function closure for multimodal_vector_index_retrieve
+        async def vector_index_retrieve_wrapper(
+            input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
+        ) -> Annotated[str, "The output is a string with the search results including text and images when available"]:
+            return await multimodal_vector_index_retrieve(input, self._generate_security_ids(client_principal))
 
-        # 2. Summarize conversation (optional)
-        conversation_summary = self._summarize_conversation(history)
-        # 3. Create a MultimodalConversableAgent
-        #    This agent can handle or embed images in the conversation.
-        mm_agent_prompt = self._read_prompt("multimodal_rag_assistant", {"conversation_summary": conversation_summary})
-        mm_agent = MultimodalConversableAgent(
+        conversation_summary = await self._summarize_conversation(history)
+        assistant_prompt = await self._read_prompt("multimodal_rag_assistant", {"conversation_summary": conversation_summary})
+        assistant = AssistantAgent(
             name="assistant",
-            system_message=mm_agent_prompt,
-            human_input_mode="NEVER",
-            llm_config=llm_config,
+            system_message=assistant_prompt,
+            model_client=self._get_model_client(), 
+            tools=[vector_index_retrieve_wrapper, get_today_date, get_time],
+            reflect_on_tool_use=True
         )
 
-        # 4. Register functions
-        def multimodal_vector_index_retrieve_wrapper(
-              input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available."]
-        ) -> Annotated[str, "The output is a string with the search results including text and images when available."]:
-            return multimodal_vector_index_retrieve(input, self._generate_security_ids(client_principal))
-        register_function(
-            multimodal_vector_index_retrieve_wrapper,
-            caller=mm_agent,
-            executor=user_proxy,
-            name="multimodal_vector_index_retrieve",
-            description="Search the knowledge base to retrieve text and image source data to ground and give context to answer a user question"
-        )
+        # Creating a UserProxyAgent since at least two participants are required for SelectorGroupChat.
+        user_proxy = UserProxyAgent("user_proxy")
 
-        register_function(
-            get_today_date,
-            caller=mm_agent,
-            executor=user_proxy,
-            name="get_today_date",
-            description="Provides today's date in YYYY-MM-DD format."
-        )
+        # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
+        # self.max_rounds = 8
+        # self.terminate_message = "TERMINATE"
 
-        register_function(
-            get_time,
-            caller=mm_agent,
-            executor=user_proxy,
-            name="get_time",
-            description="Provides the current time in HH:MM format."
-        )        
+        # Optional: Define a selector function to determine which agent to use based on the user's ask.
+        # self.selector_func = None
+        
+        self.agents = [assistant, user_proxy]
+        
+        return self._get_agent_configuration()
 
-        # 5. Return agent configuration
-        allowed_transitions = {
-            mm_agent: [user_proxy],
-            user_proxy: [mm_agent],
-        }
-        return {
-            "agents": [user_proxy, mm_agent],
-            "transitions": allowed_transitions,
-            "transitions_type": "allowed"
-        }
