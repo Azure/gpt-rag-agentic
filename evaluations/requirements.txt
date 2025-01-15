@@ -1,0 +1,28 @@
+# Azure Functions dependencies
+azure-functions
+azurefunctions-extensions-bindings-blob
+
+# Azure SDK dependencies
+azure-keyvault-secrets==4.8.0
+azure-cosmos==4.5.1
+azure-identity
+azure-mgmt-web
+azure-mgmt-storage
+azure-storage-blob
+
+# AI and NLP dependencies
+tiktoken==0.7.0
+openai==1.59.6
+
+aiohttp==3.10.5
+# asyncio==3.4.3
+
+# Promptflow evaluations
+promptflow==1.17.1
+promptflow-tools
+promptflow[azure]
+openpyxl
+
+# DO NOT include azure-functions-worker in this file
+# The Python Worker is managed by Azure Functions platform
+# Manually managing azure-functions-worker may cause unexpected issues
