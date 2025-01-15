@@ -2,9 +2,11 @@ from typing_extensions import Annotated
 from connectors import AzureOpenAIClient
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 import os
+import re
 import time
 import logging
 import requests
+import json
 
 async def vector_index_retrieve(
     input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
@@ -124,6 +126,7 @@ async def multimodal_vector_index_retrieve(
 ) -> Annotated[str, "The output is a string with the search results containing retrieved documents including text and images"]:
     """
     Variation of vector_index_retrieve that fetches text + related images from the search index
+    Returns a dictionary with separate lists for text snippets and image URLs.
     """
     aoai = AzureOpenAIClient()
 
@@ -191,7 +194,8 @@ async def multimodal_vector_index_retrieve(
         f"?api-version={search_api_version}"
     )
 
-    search_results = []
+    text_results = []
+    image_urls = []
     try:
         start_time = time.time()
         resp = requests.post(search_url, headers=headers, json=body)
@@ -203,11 +207,21 @@ async def multimodal_vector_index_retrieve(
         else:
             json_data = resp.json()
             for doc in json_data.get('value', []):
-                doc['content'] = replace_image_filenames_with_urls(doc['content'], doc.get('relatedImages', []))
-                search_results.append(doc['filepath'] + ": " + doc['content'].strip() + "\n")
+                # Extract and process content
+                content = replace_image_filenames_with_urls(doc.get('content', ''), doc.get('relatedImages', []))
+                
+                # Extract image URLs
+                doc_image_urls = re.findall(r'<figure>(https?://\S+)</figure>', content)
+                image_urls.append(doc_image_urls)
+
+                # Replace <figure>http://domain.com</figure> pattern by <img src="http://domain.com">
+                content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)                
+
+                text_results.append(doc.get('filepath', '') + ": " + content.strip())     
     except Exception as e:
         logging.error(f"[multimodal_retrieve] Exception in retrieval: {e}")
 
-    # Return a JSON string
-    sources = ' '.join(search_results)
-    return sources
+    return json.dumps({
+        "texts": text_results,
+        "images": image_urls
+    })

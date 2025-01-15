@@ -1,5 +1,5 @@
 from .strategies.classic_rag_agent_strategy import ClassicRAGAgentStrategy
-# from .strategies.multimodal_agent_strategy import MultimodalAgent
+from .strategies.multimodal_agent_strategy import MultimodalAgentStrategy
 # # NL2SQL Strategies
 # from .strategies.nl2sql_standard_strategy import NL2SQLStandardStrategy
 # from .strategies.nl2sql_advisor_strategy import NL2SQLAdvisorStrategy
@@ -13,8 +13,8 @@ class AgentStrategyFactory:
     def get_strategy(strategy_type: str):
         if strategy_type == CLASSIC_RAG:
             return ClassicRAGAgentStrategy()
-        # elif strategy_type == MULTIMODAL_RAG:
-        #     return MultimodalAgent()        
+        elif strategy_type == MULTIMODAL_RAG:
+            return MultimodalAgentStrategy()        
         # elif strategy_type == NL2SQL:
         #     return NL2SQLStandardStrategy()
         # elif strategy_type == NL2SQL_ADVISOR or strategy_type == 'nl2sql_dual':
