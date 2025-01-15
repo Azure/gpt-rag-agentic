@@ -94,30 +94,30 @@ class MultimodalMessageCreator(BaseChatAgent):
         for url_list in image_urls:  # Assuming each item in image_urls is a list of URLs
             for url in url_list:  # Iterate through each URL in the sublist
                 if image_count >= max_images:
-                    logging.info(f"Reached the maximum image limit of {max_images}. Stopping further downloads.")
+                    logging.info(f"[multimodal_agent_strategy] Reached the maximum image limit of {max_images}. Stopping further downloads.")
                     break  # Stop processing more URLs                
                 try:
 
                     # Initialize BlobClient with the blob URL
                     blob_client = BlobClient(blob_url=url)
-                    logging.debug(f"Initialized BlobClient for URL: {url}")
+                    logging.debug(f"[multimodal_agent_strategy] Initialized BlobClient for URL: {url}")
                     
                     # Download the blob data as bytes
                     blob_data = blob_client.download_blob()
-                    logging.debug(f"Downloaded blob data for URL: {url}")
+                    logging.debug(f"[multimodal_agent_strategy] Downloaded blob data for URL: {url}")
                     
                     # Open the image using PIL
                     base64_str = base64.b64encode(blob_data).decode('utf-8')
                     pil_img = Image.from_base64(base64_str)
-                    logging.debug(f"Opened image from URL: {url}")
+                    logging.debug(f"[multimodal_agent_strategy] Opened image from URL: {url}")
                     
                     # Append the PIL Image object to your list (modify as needed)
                     image_objects.append(pil_img)
                     image_count += 1  # Increment the counter
-                    logging.info(f"Successfully loaded image from {url}")
+                    logging.info(f"[multimodal_agent_strategy] Successfully loaded image from {url}")
 
                 except Exception as e:
-                    logging.error(f"Could not load image from {url}: {e}")
+                    logging.error(f"[multimodal_agent_strategy] Could not load image from {url}: {e}")
 
 
         # Construct and return the MultiModalMessage response

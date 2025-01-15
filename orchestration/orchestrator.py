@@ -58,8 +58,6 @@ class Orchestrator:
             final_answer = result.messages[-1].content if result.messages else "No answer generated."
             if final_answer.endswith(agent_configuration['terminate_message']):
                 final_answer = final_answer[:-len(agent_configuration['terminate_message'])].strip()
-            if final_answer.endswith(f"**{agent_configuration['terminate_message']}**"):
-                final_answer = final_answer[:-len(f"**{agent_configuration['terminate_message']}**")].strip()
             answer_dict = {"conversation_id": self.conversation_id, "answer": final_answer}
             if include_metadata:
                 chat_log = self._get_chat_log(result.messages)
