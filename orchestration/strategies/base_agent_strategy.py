@@ -1,17 +1,153 @@
 import logging
 import os
-import re 
+import re
 
 from connectors import AzureOpenAIClient
+from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential, get_bearer_token_provider
+from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
+from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
 
 class BaseAgentStrategy:
     def __init__(self):
-        pass
+        # Azure OpenAI model client configuration
+        self.aoai_resource = os.environ.get('AZURE_OPENAI_RESOURCE', 'openai')
+        self.chat_deployment = os.environ.get('AZURE_OPENAI_CHATGPT_DEPLOYMENT', 'chat')
+        self.model = os.environ.get('AZURE_OPENAI_CHATGPT_MODEL', 'gpt-4o')
+        self.api_version = os.environ.get('AZURE_OPENAI_API_VERSION', '2024-10-21')
+        self.max_tokens = int(os.environ.get('AZURE_OPENAI_MAX_TOKENS', 1000))
+        self.temperature = float(os.environ.get('AZURE_OPENAI_TEMPERATURE', 0.7))
 
-    def create_agents(self, llm_config, history, client_principal=None):
+        # Autogen agent configuration (base to be overridden)
+        self.agents = []
+        self.terminate_message = "TERMINATE"
+        self.max_rounds = 8
+        self.selector_func = None
+
+    async def create_agents(self, history, client_principal=None):
+        """
+        Create agent instances for the strategy.
+
+        This method must be implemented by subclasses to define how agents
+        are created and configured for a given strategy.
+
+        Parameters:
+            history (list): The conversation history up to the current point.
+            client_principal (dict, optional): Information about the client principal, such as group memberships.
+
+        Raises:
+            NotImplementedError: If the method is not implemented in a subclass.
+        """
         raise NotImplementedError("This method should be overridden in subclasses.")
 
-    def _read_prompt(self, agent_name, placeholders=None):
+    def _get_agent_configuration(self):
+        """
+        Retrieve the configuration for agents managed by this strategy.
+
+        Returns:
+            dict: A dictionary containing the model client, agents, termination condition,
+            and selector function.
+        """
+        return {
+            "model_client": self._get_model_client(),
+            "agents": self.agents,
+            "terminate_message": self._get_terminate_message(),            
+            "termination_condition": self._get_termination_condition(),
+            "selector_func": self.selector_func
+        }
+
+    def _get_terminate_message(self):
+        return self.terminate_message
+
+    def _get_model_client(self):
+        """
+        Set up the configuration for the Azure OpenAI language model client.
+
+        Initializes the `AzureOpenAIChatCompletionClient` with the required settings for
+        interaction with Azure OpenAI services.
+        """
+        token_provider = get_bearer_token_provider(
+            ChainedTokenCredential(
+                ManagedIdentityCredential(),
+                AzureCliCredential()
+            ), "https://cognitiveservices.azure.com/.default"
+        )
+        return AzureOpenAIChatCompletionClient(
+            azure_deployment=self.chat_deployment,
+            model=self.model,
+            azure_endpoint=f"https://{self.aoai_resource}.openai.azure.com",
+            azure_ad_token_provider=token_provider,
+            api_version=self.api_version,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens
+        )
+
+    def _get_termination_condition(self):
+        """
+        Define the termination condition for agent interactions.
+
+        Returns:
+            Condition or None: A combined condition object or None if no conditions are specified.
+        """
+        conditions = []
+
+        if self.terminate_message is not None:
+            conditions.append(TextMentionTermination(self.terminate_message))
+
+        if self.max_rounds is not None:
+            conditions.append(MaxMessageTermination(max_messages=self.max_rounds))
+
+        if not conditions:
+            return None
+
+        termination_condition = conditions[0]
+        for condition in conditions[1:]:
+            termination_condition |= condition
+
+        return termination_condition
+
+    async def _summarize_conversation(self, history: list) -> str:
+        """
+        Summarize the conversation history.
+
+        Parameters:
+            history (list): A list of messages representing the conversation history.
+
+        Returns:
+            str: A summary of the conversation, including main topics, decisions, questions,
+            unresolved issues, and document identifiers if mentioned.
+        """
+        if history:
+            aoai = AzureOpenAIClient()
+            prompt = (
+                "Please summarize the following conversation, highlighting the main topics discussed, the specific subject "
+                "if mentioned, any decisions made, questions raised, and any unresolved issues or actions pending. "
+                "If there is a document or object mentioned with an identifying number, include that information for future reference. "
+                f"Conversation history: \n{history}"
+            )
+            conversation_summary = aoai.get_completion(prompt)
+        else:
+            conversation_summary = "The conversation just started."
+        logging.info(f"[base_agent_strategy] Conversation summary: {conversation_summary[:200]}")
+        return conversation_summary
+
+    def _generate_security_ids(self, client_principal):
+        """
+        Generate security identifiers based on the client principal.
+
+        Parameters:
+            client_principal (dict): Information about the client principal, including the user ID
+            and group names.
+
+        Returns:
+            str: A string representing the security identifiers, combining the user ID and group names.
+        """
+        security_ids = 'anonymous'
+        if client_principal is not None:
+            group_names = client_principal['group_names']
+            security_ids = f"{client_principal['id']}" + (f",{group_names}" if group_names else "")
+        return security_ids
+
+    async def _read_prompt(self, agent_name, placeholders=None):
         """
         Reads the prompt file for a given agent, checking for custom or default files.
 
@@ -104,6 +240,7 @@ class BaseAgentStrategy:
                         f"[base_agent_strategy] Placeholder '{{{{{placeholder_name}}}}}' could not be replaced."
                     )
             return prompt
+        
 
     def _prompt_dir(self):
             """
@@ -119,26 +256,3 @@ class BaseAgentStrategy:
                 raise ValueError("strategy_type is not defined")        
             prompts_dir = "prompts" + "/" + self.strategy_type
             return prompts_dir
-    
-    def _summarize_conversation(self, history: list) -> str:
-        """Summarize the conversation history."""
-        if history:
-            aoai = AzureOpenAIClient()
-            prompt = (
-                "Please summarize the following conversation, highlighting the main topics discussed, the specific subject "
-                "if mentioned, any decisions made, questions raised, and any unresolved issues or actions pending. "
-                "If there is a document or object mentioned with an identifying number, include that information for future reference. "
-                f"Conversation history: \n{history}"
-            )
-            conversation_summary = aoai.get_completion(prompt)
-        else:
-            conversation_summary = "The conversation just started."
-        logging.info(f"[base_agent_strategy] Conversation summary: {conversation_summary[:200]}")
-        return conversation_summary
-    
-    def _generate_security_ids(self, client_principal):
-        security_ids = 'anonymous'
-        if client_principal is not None:
-            group_names = client_principal['group_names']
-            security_ids = f"{client_principal['id']}" + (f",{group_names}" if group_names else "")
-        return security_ids

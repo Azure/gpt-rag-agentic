@@ -56,16 +56,6 @@ class NL2SQLBaseStrategy(BaseAgentStrategy, ABC):
         connector = SQLDBClient()
         connection = await connector.create_connection()
         return connection
-
-    @property
-    @abstractmethod
-    def max_rounds(self):
-        pass
-
-    @property
-    @abstractmethod
-    def send_introductions(self):
-        pass
     
     @abstractmethod
     def create_agents(self, llm_config, history, client_principal=None):
