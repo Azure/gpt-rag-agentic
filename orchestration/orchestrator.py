@@ -62,13 +62,13 @@ class Orchestrator:
             if include_metadata:
                 chat_log = self._get_chat_log(result.messages)
                 data_points = self._get_data_points(chat_log)
-                answer_dict.update({"chat_log": chat_log, "data_points": data_points})
+                answer_dict.update({"thoughts": chat_log, "data_points": data_points})
             return answer_dict
         except Exception as e:
             logging.error(f"[orchestrator] {self.short_id} An error occurred: {str(e)}", exc_info=True)
             answer_dict = {"conversation_id": self.conversation_id, "answer": f"We encountered an issue processing your request. Please try again later. Error {str(e)}"}
             if include_metadata:
-                answer_dict.update({"chat_log": [], "data_points": []})
+                answer_dict.update({"thoughts": [], "data_points": []})
             return answer_dict
 
     def _get_chat_log(self, messages):
