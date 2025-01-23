@@ -17,7 +17,6 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
    - [3.2 Data Dictionary and Query samples](#nl2sql-data)
    - [3.3 Database Connection Setup](#database-connection-setup)
    - [3.3.1 SQL Database Connection](#sql-database-connection)
-   - [3.3.2 Teradata Connection](#teradata-connection)
 4. [**Evaluation**](#evaluation)
 5. [**Contributing**](#contributing)
 6. [**Trademarks**](#trademarks)
@@ -91,19 +90,17 @@ The orchestrator selects the agent strategy based on the `AUTOGEN_ORCHESTRATION_
 
 The orchestrator supports the following strategies, each tailored to specific needs:
 
-- **classic_rag**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
+- **Classical RAG**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
 
-- **nl2sql**: The `nl2sql` strategy enables the orchestrator to convert natural language queries into SQL statements. This allows users to interact with relational databases using everyday language, simplifying data retrieval processes without requiring users to write complex SQL queries.
+- **Multimodal RAG**: In the `multimodal_rag` strategy, user queries are searched in an index containing text content and image descriptions. The system combines text and images to generate a comprehensive response.
 
-##### Additional NL2SQL Strategies
+- **NL2SQL**: The `nl2sql` strategy enables the orchestrator to convert natural language queries into SQL statements. This allows users to interact with relational databases using everyday language, simplifying data retrieval processes without the need to write complex SQL queries. Currently, this strategy is designed to execute queries on SQL databases in Azure.
 
-To enhance the functionality and accuracy of SQL query generation, the orchestrator offers specialized variations of the `nl2sql` strategy:
+- **NL2SQL Fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
 
-- **nl2sql_fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
+- **NL2SQL Fewshot Scales**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
 
-- **nl2sql_fewshot_scaled**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
-
-- **nl2sql_dual**: The `nl2sql_dual` strategy introduces a dual-agent system where a second agent reviews and refines the generated SQL queries and responses. This additional layer of validation ensures higher accuracy and clarity in the translated queries, reducing the likelihood of errors and enhancing the reliability of the responses.
+- **Chat with Fabric**: The `chat_with_fabric` strategy allows the orchestrator to interact with data stored in Microsoft Fabric, enabling users to query elements such as tables within both Lakehouse and semantic models. This strategy provides easy access to structured and semi-structured data in Fabric, allowing users to retrieve insights without deep knowledge of the underlying architecture.
 
 ### How to Add and Configure you Own Agent Strategies
 
@@ -241,10 +238,7 @@ This section provides configuration steps for the various NL2SQL strategies. The
 
 **Data Dictionary**
 
-The Data Dictionary is essential for SQL generation, providing a structured reference for database tables and columns. If you're using the standard `nl2sql` strategy, simply review and update the `config/data_dictionary.json` file as needed.
-
-> [!NOTE]
-> If you prefer, you can create a `config/data_dictionary.custom.json` file, which will override the example file in `config/data_dictionary.json`.
+The Data Dictionary is essential for SQL generation, providing a structured reference for database tables and columns. If you're using the standard `nl2sql` strategy, simply review and update the `config/nl2sql/data_dictionary.json` file as needed.
 
 If you're using the `nl2sql_fewshot_scaled` strategy, the `data_dictionary.json` file will not be used. In this case, you'll need to create the JSON files differently to be indexed. You can refer to the examples in [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) to see how to set up the table and column files for AI Search indexing.
 
@@ -282,31 +276,6 @@ To set up a connection to your SQL Database, follow these steps based on your au
 
    - If `SQL_DATABASE_UID` is set, the code will use SQL Authentication, retrieving the password from the Key Vault.
    - If `SQL_DATABASE_UID` is not set, the code will default to Azure AD token-based authentication. 
-
-### Teradata Connection
-
-To set up a connection to your Teradata database, follow these steps:
-
-1. **Install the Teradata SQL driver**:
-
-    ```bash
-    pip install teradatasql
-    ```
-
-2. **Configure Teradata connection settings in your environment**:
-
-    ```bash
-    TD_HOST=teradata-host
-    TD_USER=teradata-username
-    ```
-
-3. **Set up the password**:
-
-   - Store the Teradata password securely in Key Vault under the name `teradataPassword`.
-
-4. **Permissions**:
-
-    Ensure your Teradata user has the necessary permissions for query access.
 
 ## Evaluation
 
