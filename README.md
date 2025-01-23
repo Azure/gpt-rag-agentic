@@ -6,7 +6,7 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
 
 1. [**Concepts**](#concepts)
    - [1.1 How the Orchestrator Works](#how-the-orchestrator-works)
-   - [1.2 Agent Creation and Strategies](#agent-creation-and-strategies)
+   - [1.2 Agent Strategies](#selecting-an-agent-strategy)
    - [1.3 Create your Own Agent Strategy](#how-to-add-and-configure-you-own-agent-strategies)
 2. [**Running the Orchestrator**](#running-the-orchestrator)
    - [2.1 Cloud Deployment](#cloud-deployment)
@@ -17,7 +17,6 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
    - [3.2 Data Dictionary and Query samples](#nl2sql-data)
    - [3.3 Database Connection Setup](#database-connection-setup)
    - [3.3.1 SQL Database Connection](#sql-database-connection)
-   - [3.3.2 Teradata Connection](#teradata-connection)
 4. [**Evaluation**](#evaluation)
 5. [**Contributing**](#contributing)
 6. [**Trademarks**](#trademarks)
@@ -28,52 +27,37 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
 
 ### How the Orchestrator Works
 
-The **GPT-RAG Agentic Orchestrator** is a powerful system that leverages AutoGen's group chat capabilities to facilitate collaboration among multiple specialized agents. This orchestrator is designed to handle complex tasks by coordinating the interactions of agents, each with a specific role, to produce coherent and accurate responses.
+The **GPT-RAG Agentic Orchestrator** is a powerful system that leverages AutoGen's AgetChat programming framework to facilitate collaboration among multiple specialized agents. This orchestrator is designed to handle complex tasks by coordinating the interactions of agents, each with a specific role, to produce coherent and accurate responses. For more details about AutoGen, refer to its [documentation](https://microsoft.github.io/autogen/stable/).
 
-#### Architecture Overview
+#### Multi-Agent Group Chat    
+     
+Our orchestrator employs AutoGen's `Selector Group Chat` pattern to facilitate dynamic conversations involving multiple agents. The group chat coordinates agent interactions based on the selected strategy.
 
-At its core, the orchestrator employs a factory pattern to create agents based on predefined strategies. The `AgentStrategyFactory` is responsible for instantiating the appropriate agents according to the selected strategy, such as `classic_rag` or `nl2sql`. Each strategy defines a unique set of agents, their roles, and how they interact within the group chat.
+![Selector Group Chat](media/selector-group-chat.svg)
+<BR>*Example of a Group Chat obtained from the AutoGen documentation.*
 
-#### Agent Creation and Strategies
+> [!Note]
+> The agents shown here are examples. You can define your own agents tailored to your use cases.
 
-The orchestrator supports various strategies to address different types of queries and data interactions. For example:
+#### Agent Strategies
 
-- **Classic RAG Strategy (`classic_rag`)**: This strategy focuses on retrieval-augmented generation, where agents work together to retrieve relevant information from a knowledge base and generate responses grounded in that information.
+The orchestrator uses a factory pattern to create agents based on predefined strategies. The `AgentStrategyFactory` handles the creation of agents for each selected strategy, such as `classic_rag` or `nl2sql`. Each strategy defines a unique set of agents, their roles, and their interactions within the group chat.
 
-- **NL2SQL Strategy (`nl2sql`)**: This strategy enables the system to translate natural language queries into SQL statements, allowing users to interact with databases using everyday language.
+Different strategies support various queries and data interactions:
 
-Each strategy defines how agents are created and configured. The creation code for each strategy involves:
+- **Classic RAG Strategy (`classic_rag`)**: This strategy centers on retrieval-augmented generation, where agents collaborate to retrieve relevant information from a knowledge base and generate responses based on that information.
+- **NL2SQL Strategy (`nl2sql`)**: This strategy translates natural language queries into SQL statements, enabling users to interact with databases using everyday language.
 
-1. **Creating Agents**: Agents are instantiated with specific roles and system messages. For instance, in the `classic_rag` strategy, the agents include:
-
-   - **UserProxyAgent**: Acts as a proxy for the user, executing any function calls made by AssistantAgent
-   - **AssistantAgent**: Responsible for generating responses, using the conversation history summarized for context.
-   - **ChatClosureAgent**: Manages the closure of the conversation.
-
-2. **Registering Functions**: Functions, which we can also refer to as tools, are registered to enable agents to perform specific tasks, such as retrieving data from a vector index or getting the current date and time. These functions are registered with the assistant agent as the caller and the user proxy agent as the executor.
-
-3. **Defining Transitions**: The allowed transitions between agents are specified to control the flow of the conversation. For example, in the `classic_rag` strategy, the assistant agent can transition to either the chat closure agent or back to the user proxy agent.
-
-#### Multi-Agent Group Chat
-
-The orchestrator utilizes AutoGen's group chat pattern to manage conversations involving multiple agents. The group chat is orchestrated by a `GroupChatManager`, which coordinates the interactions among agents based on the selected strategy. 
-
-![group chat](media/group_chat_adapted.png)<BR>
-*Illustration of a Group Chat Round, adapted from the AutoGen repository*
-
-The process involves:
-
-1. **Initiation**: The user proxy agent initiates the conversation with a user query.
-
-2. **Agent Communication**: Agents communicate by sending messages to each other, following the allowed transitions. They may call registered functions to perform tasks like data retrieval or query execution.
-
-3. **Response Generation**: The assistant agent synthesizes the information gathered and generates a response to the user's query.
-
-4. **Conversation Closure**: The chat closure agent manages the termination of the conversation when appropriate.
-
-#### Multi-Round Interactions
-
-The orchestrator supports multiple interaction rounds, allowing agents to share insights and collaborate efficiently. The `max_rounds` property in each strategy defines the maximum number of rounds permitted. This enables complex queries to be addressed thoroughly, with agents iteratively refining the response.
+#### Elements of a Strategy:
+     
+- **The Agents Team**: Agents are instantiated with distinct roles and system messages. For example, in the `multimodal_rag` strategy, the agents include:    
+       
+   - **Assistant Agent**: Processes the user ask and invokes the necessary tools, such as `multimodal_vector_index_retrieve`, to gather relevant data. 
+   - **Multimodal Message Creator**: Constructs a `MultiModalMessage` containing text and image data, ensuring the response is based on multimodal content. 
+     
+- **Functions used by agents**: Functions (or tools) empowers agents it with specific capabilities such as data retrieval or executing complex queries. There's no need to register tools separately, simply inform the `AssistantAgent` which tool to execute.    
+     
+- **Agent Selection**: Transition rules are established to control the flow of conversations between agents. The **Selector Function** defines rules for selecting the next agent to engage in the conversation based on the current context and message flow.    
 
 #### Customization and Extensibility
 
@@ -91,19 +75,15 @@ The orchestrator selects the agent strategy based on the `AUTOGEN_ORCHESTRATION_
 
 The orchestrator supports the following strategies, each tailored to specific needs:
 
-- **classic_rag**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
+- **Classical RAG**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
 
-- **nl2sql**: The `nl2sql` strategy enables the orchestrator to convert natural language queries into SQL statements. This allows users to interact with relational databases using everyday language, simplifying data retrieval processes without requiring users to write complex SQL queries.
+- **Multimodal RAG**: In the `multimodal_rag` strategy, user queries are searched in an index containing text content and image descriptions. The system combines text and images to generate a comprehensive response.
 
-##### Additional NL2SQL Strategies
+- **NL2SQL**: The `nl2sql` strategy enables the orchestrator to convert natural language queries into SQL statements. This allows users to interact with relational databases using everyday language, simplifying data retrieval processes without the need to write complex SQL queries. Currently, this strategy is designed to execute queries on SQL databases in Azure.
 
-To enhance the functionality and accuracy of SQL query generation, the orchestrator offers specialized variations of the `nl2sql` strategy:
+- **NL2SQL Fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
 
-- **nl2sql_fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
-
-- **nl2sql_fewshot_scaled**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
-
-- **nl2sql_dual**: The `nl2sql_dual` strategy introduces a dual-agent system where a second agent reviews and refines the generated SQL queries and responses. This additional layer of validation ensures higher accuracy and clarity in the translated queries, reducing the likelihood of errors and enhancing the reliability of the responses.
+- **NL2SQL Fewshot Scales**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
 
 ### How to Add and Configure you Own Agent Strategies
 
@@ -156,7 +136,7 @@ Ensure the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly se
 
 ### Cloud Deployment
 
-Deploy the orchestrator to the cloud using the Azure Developer CLI:
+**Option 1: Deploy the orchestrator to the cloud using the Azure Developer CLI**
 
 ```bash
 azd auth login
@@ -164,7 +144,24 @@ azd env refresh
 azd deploy
 ```
 
-Ensure prerequisites, like Python 3.11, Azure Developer CLI, and Git, are installed.
+Ensure [Python 3.11](https://www.python.org/downloads/release/python-3118/) and [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd) are installed.
+
+**Option 2: Using Azure Functions Core Tools**
+
+```bash
+az login
+func azure functionapp publish FUNCTION_APP_NAME --python
+```
+
+*Replace FUNCTION_APP_NAME with your Orchestrator Function App name before running the command* 
+
+After finishing the deployment run the following command to confirm the function was deployed:  
+```bash
+func azure functionapp list-functions FUNCTION_APP_NAME
+```
+
+Ensure [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local?tabs=windows%2Cisolated-process%2Cnode-v4%2Cpython-v2%2Chttp-trigger%2Ccontainer-apps&pivots=programming-language-python#install-the-azure-functions-core-tools) and  [AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) ar installed.
+
 
 ### Running the Chat Client Locally
 
@@ -282,31 +279,6 @@ To set up a connection to your SQL Database, follow these steps based on your au
 
    - If `SQL_DATABASE_UID` is set, the code will use SQL Authentication, retrieving the password from the Key Vault.
    - If `SQL_DATABASE_UID` is not set, the code will default to Azure AD token-based authentication. 
-
-### Teradata Connection
-
-To set up a connection to your Teradata database, follow these steps:
-
-1. **Install the Teradata SQL driver**:
-
-    ```bash
-    pip install teradatasql
-    ```
-
-2. **Configure Teradata connection settings in your environment**:
-
-    ```bash
-    TD_HOST=teradata-host
-    TD_USER=teradata-username
-    ```
-
-3. **Set up the password**:
-
-   - Store the Teradata password securely in Key Vault under the name `teradataPassword`.
-
-4. **Permissions**:
-
-    Ensure your Teradata user has the necessary permissions for query access.
 
 ## Evaluation
 
