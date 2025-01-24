@@ -104,9 +104,13 @@ class Orchestrator:
                 content = msg["content"][0]
                 call_id = content.split("call_id='")[1].split("')")[0]
                 if call_id in call_id_map:
-                    data = content.split("content='")[1].rsplit("',", 1)[0]
-                    entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
-                    data_points.extend(entries)
+
+                    content_match = re.search(r"content='(.*?)',", content)
+                    if content_match:
+                        data = content_match.group(1)
+                        entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
+                        data_points.extend(entries)
+                        
         return data_points
 
     async def _update_conversation(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):
