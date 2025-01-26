@@ -64,15 +64,12 @@ class NL2SQLAdvisorStrategy(NL2SQLBaseStrategy):
             Selects the next agent based on the source of the last message.
             
             Transition Rules:
-               assistant -> advisor             
-               advisor -> assistant
+               user -> assistant
+               assistant -> None (SelectorGroupChat will handle transition)
             """
             last_msg = messages[-1]
-            last_source = last_msg.source
-
             if last_msg.source == "user":
                 return "assistant"
-            
             else:
                 return None     
         

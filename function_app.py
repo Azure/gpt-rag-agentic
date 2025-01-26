@@ -25,8 +25,7 @@ async def orc(req: func.HttpRequest) -> func.HttpResponse:
 
         # Get input parameters
         conversation_id = req_body.get('conversation_id')
-        question = req_body.get('question')       
-        include_metadata = req_body.get('metadata', 'yes').lower() in ['true', '1', 'yes']
+        question = req_body.get('question')
 
         # Get client principal information
         client_principal_id = req_body.get('client_principal_id', '00000000-0000-0000-0000-000000000000')
@@ -41,7 +40,7 @@ async def orc(req: func.HttpRequest) -> func.HttpResponse:
         # Call orchestrator
         if question:
             orchestrator = Orchestrator(conversation_id, client_principal)
-            result = await orchestrator.answer(question, include_metadata)
+            result = await orchestrator.answer(question)
             return func.HttpResponse(
                 json.dumps(result),
                 mimetype="application/json",

@@ -25,7 +25,6 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
 
         self.max_rounds = 20
 
-
         def get_schema_info(table_name: Optional[str] = None, column_name: Optional[str] = None) -> SchemaInfo:
             return self._get_schema_info(table_name, column_name)
 
@@ -63,16 +62,14 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
             Selects the next agent based on the source of the last message.
             
             Transition Rules:
-               assistant -> advisor             
-               advisor -> assistant
+               user -> assistant
+               assistant -> None (SelectorGroupChat will handle transition)
             """
             last_msg = messages[-1]
-            last_source = last_msg.source
-
-            if last_source == "user":
+            if last_msg.source == "user":
                 return "assistant"
             else:
-                return None       
+                return None      
         
         self.selector_func = custom_selector_func
 

@@ -33,24 +33,45 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
 
         conversation_summary = await self._summarize_conversation(history)
         assistant_prompt = await self._read_prompt("classic_rag_assistant", {"conversation_summary": conversation_summary})
-        assistant = AssistantAgent(
-            name="assistant",
+        main_assistant = AssistantAgent(
+            name="main_assistant",
             system_message=assistant_prompt,
             model_client=self._get_model_client(), 
             tools=[vector_index_retrieve_wrapper, get_today_date, get_time],
             reflect_on_tool_use=True
         )
 
-        # Creating a UserProxyAgent since at least two participants are required for SelectorGroupChat.
-        user_proxy = UserProxyAgent("user_proxy")
+        # Create chat closure agent
+        chat_closure_prompt = await self._read_prompt("chat_closure")
+        chat_closure = AssistantAgent(
+            name="chat_closure",
+            system_message=chat_closure_prompt,
+            model_client=self._get_model_client(),
+            reflect_on_tool_use=True
+        )
 
         # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
         # self.max_rounds = 8
         # self.terminate_message = "TERMINATE"
 
         # Optional: Define a selector function to determine which agent to use based on the user's ask.
-        # self.selector_func = None
+        def custom_selector_func(messages):
+            """
+            Selects the next agent based on the source of the last message.
+            
+            Transition Rules:
+               user -> assistant
+               assistant -> None (SelectorGroupChat will handle transition)
+            """
+            last_msg = messages[-1]
+            if last_msg.source == "user":
+                return "assistant"
+            
+            else:
+                return None     
         
-        self.agents = [assistant, user_proxy]
+        self.selector_func = custom_selector_func
+        
+        self.agents = [main_assistant, chat_closure]
         
         return self._get_agent_configuration()

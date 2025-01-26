@@ -84,7 +84,7 @@ The orchestrator supports the following strategies, each tailored to specific ne
 
 - **NL2SQL Fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
 
-- **NL2SQL Fewshot Scales**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
+- **NL2SQL Fewshot Scaled**: The `nl2sql_fewshot_scaled` strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
 
 - **Chat with Fabric**: The `chat_with_fabric` strategy allows the orchestrator to interact with data stored in Microsoft Fabric, enabling users to query elements such as tables within both Lakehouse and semantic models. This strategy provides easy access to structured and semi-structured data in Fabric, allowing users to retrieve insights without deep knowledge of the underlying architecture.
 
