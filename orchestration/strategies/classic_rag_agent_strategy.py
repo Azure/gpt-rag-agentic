@@ -65,8 +65,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
             """
             last_msg = messages[-1]
             if last_msg.source == "user":
-                return "assistant"
-            
+                return "main_assistant"
             else:
                 return None     
         

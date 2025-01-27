@@ -69,16 +69,29 @@ class Orchestrator:
             # Remove termination message if present
             terminate_msg = agent_configuration.get('terminate_message', '')
             if terminate_msg and final_answer.endswith(terminate_msg):
-                final_answer = final_answer[:-len(terminate_msg)].strip()
+                final_answer = final_answer[:-len(terminate_msg)].strip()  
+
+            # Update answer and thoughts
+            # In some cases, the response may be a JSON, so we attempt to parse it to obtain 
+            # the 'answer' and 'thoughts'. In other cases, the response is a simple string.
+            try:
+                parsed_json = json.loads(final_answer)
+                if isinstance(parsed_json, dict):
+                    answer_dict["answer"] = parsed_json.get("answer", parsed_json)
+                    answer_dict["thoughts"] = parsed_json.get("thoughts", "")
+            except json.JSONDecodeError:
+                # final_answer is a plain string, keep it as-is
+                answer_dict["answer"] = final_answer
+                pass
 
             # Update data points if available in chat log
-            chat_log = self._get_chat_log()
-            data_points = self._get_data_points(chat_log)            
+            chat_log = self._get_chat_log(result.messages)
+            answer_dict["data_points"] =  self._get_data_points(chat_log)
+            chat_log_formatted = self._print_chat_log(chat_log)
+            logging.info(f"[orchestrator] {self.short_id} Chat log:\n {chat_log_formatted}")
 
-            # Update answer and thoughts if available in final answer
-            parsed_answer = json.loads(final_answer)
-            answer_dict["answer"] = parsed_answer.get("answer", parsed_answer)
-            answer_dict["thoughts"] = parsed_answer.get("thoughts", "")
+            if answer_dict["thoughts"] == "":
+                answer_dict["thoughts"] = chat_log_formatted
 
             return answer_dict
 
@@ -103,6 +116,16 @@ class Orchestrator:
             chat_log.append({"speaker": msg.source, "message_type": msg.type, "content": safe_content})
         return chat_log
 
+
+    def _print_chat_log(self, chat_log):
+        result = []
+        for item in chat_log:
+            item_str = json.dumps(item, ensure_ascii=False)
+            truncated_str = item_str[:300] + "..." if len(item_str) > 200 else item_str
+            result.append(truncated_str + "\n")
+        final_string = "".join(result)
+        return final_string
+
     def _get_data_points(self, chat_log):
         data_points = []
         call_id_map = {}
@@ -110,12 +133,13 @@ class Orchestrator:
             if msg["message_type"] == "ToolCallRequestEvent":
                 content = msg["content"][0]
                 call_id = content.split("id='")[1].split("',")[0]
-                call_id_map[call_id] = None
+                function_name = content.split("name='")[1].split("')")[0]
+                if function_name == "vector_index_retrieve_wrapper":
+                    call_id_map[call_id] = None
             elif msg["message_type"] == "ToolCallExecutionEvent":
                 content = msg["content"][0]
                 call_id = content.split("call_id='")[1].split("')")[0]
-                function_name = content.split("name='")[1].split("')")[0]
-                if call_id in call_id_map and function_name == "vector_index_retrieve_wrapper":
+                if call_id in call_id_map:
                     content_match = re.search(r"content='(.*?)',", content)
                     if content_match:
                         data = content_match.group(1)

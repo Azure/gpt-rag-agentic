@@ -34,14 +34,14 @@ async def vector_index_retrieve(
                 AzureCliCredential()
             )
         start_time = time.time()
-        logging.info(f"[ai_search] generating question embeddings. search query: {search_query}")
+        logging.info(f"[vector_index_retrieve] generating question embeddings. search query: {search_query}")
         embeddings_query = aoai.get_embeddings(search_query)
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] finished generating question embeddings. {response_time} seconds")
+        logging.info(f"[vector_index_retrieve] finished generating question embeddings. {response_time} seconds")
         azureSearchKey = credential.get_token("https://search.azure.com/.default")
         azureSearchKey = azureSearchKey.token
 
-        logging.info(f"[ai_search] querying azure ai search. search query: {search_query}")
+        logging.info(f"[vector_index_retrieve] querying azure ai search. search query: {search_query}")
         # prepare body
         body = {
             "select": "title, content, url, filepath, chunk_id",
@@ -75,7 +75,7 @@ async def vector_index_retrieve(
         )
         body["filter"] = filter_str
 
-        logging.debug(f"[ai_search] search filter: {filter_str}")
+        logging.debug(f"[vector_index_retrieve] search filter: {filter_str}")
 
         headers = {
             'Content-Type': 'application/json',
@@ -90,21 +90,21 @@ async def vector_index_retrieve(
         text = response.text
         json =response.json()    
         if status_code >= 400:
-            logging.error(f"[multimodal_retrieve] error {response.status_code}: {response.text}")
+            logging.error(f"[vector_index_retrieve] error {response.status_code}: {response.text}")
         else:
             if json['value']:
-                logging.info(f"[ai_search] {len(json['value'])} documents retrieved")
+                logging.info(f"[vector_index_retrieve] {len(json['value'])} documents retrieved")
                 for doc in json['value']:
                     search_results.append(doc['filepath'] + ": " + doc['content'].strip() + "\n")
             else:
-                logging.info(f"[ai_search] No documents retrieved")
+                logging.info(f"[vector_index_retrieve] No documents retrieved")
 
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] finished querying azure ai search. {response_time} seconds")
+        logging.info(f"[vector_index_retrieve] finished querying azure ai search. {response_time} seconds")
 
     except Exception as e:
         error_message = str(e)
-        logging.error(f"[ai_search] error when getting the answer {error_message}")
+        logging.error(f"[vector_index_retrieve] error when getting the answer {error_message}")
 
     sources =  ' '.join(search_results)
     return sources
@@ -139,13 +139,13 @@ async def multimodal_vector_index_retrieve(
     search_api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2024-07-01')
     use_semantic = (os.getenv('AZURE_SEARCH_USE_SEMANTIC', 'false').lower() == 'true')
 
-    logging.info(f"[multimodal_retrieve] user input: {input}")
+    logging.info(f"[multimodal_vector_index_retrieve] user input: {input}")
 
     # 1. Generate embeddings for the user query
     start_time = time.time()
     embeddings_query = aoai.get_embeddings(input)
     embedding_time = round(time.time() - start_time, 2)
-    logging.info(f"[multimodal_retrieve] Query embeddings took {embedding_time} seconds")
+    logging.info(f"[multimodal_vector_index_retrieve] Query embeddings took {embedding_time} seconds")
 
     # Prepare authentication
     credential = ChainedTokenCredential(ManagedIdentityCredential(), AzureCliCredential())
@@ -200,10 +200,10 @@ async def multimodal_vector_index_retrieve(
         start_time = time.time()
         resp = requests.post(search_url, headers=headers, json=body)
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[multimodal_retrieve] Finished querying Azure AI search. {response_time} seconds")
+        logging.info(f"[multimodal_vector_index_retrieve] Finished querying Azure AI search. {response_time} seconds")
         
         if resp.status_code >= 400:
-            logging.error(f"[multimodal_retrieve] error {resp.status_code}: {resp.text}")
+            logging.error(f"[multimodal_vector_index_retrieve] error {resp.status_code}: {resp.text}")
         else:
             json_data = resp.json()
             for doc in json_data.get('value', []):
@@ -219,7 +219,7 @@ async def multimodal_vector_index_retrieve(
 
                 text_results.append(doc.get('filepath', '') + ": " + content.strip())     
     except Exception as e:
-        logging.error(f"[multimodal_retrieve] Exception in retrieval: {e}")
+        logging.error(f"[multimodal_vector_index_retrieve] Exception in retrieval: {e}")
 
     return json.dumps({
         "texts": text_results,

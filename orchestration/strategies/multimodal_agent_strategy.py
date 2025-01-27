@@ -141,7 +141,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
 
     async def create_agents(self, history, client_principal=None):
         """
-        Classic RAG creation strategy that creates the basic agents and registers functions.
+        Multimodal RAG creation strategy that creates the basic agents and registers functions.
         
         Parameters:
         - history: The conversation history, which will be summarized to provide context for the assistant's responses.
@@ -177,9 +177,9 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         multimodal_creator = MultimodalMessageCreator("multimodal_creator", multimodal_rag_message_prompt)
 
         # Assistant Agent
-        assistant = AssistantAgent(
-            name="assistant",
-            system_message="""You are a helpful assistant. After answering the question, say TERMINATE to end the conversation.""",
+        main_assistant = AssistantAgent(
+            name="main_assistant",
+            system_message="You are a helpful assistant, you always include the word TERMINATE in your answers.",
             model_client=self._get_model_client(),
             reflect_on_tool_use=True    
         )
@@ -204,11 +204,11 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
             if last_msg.source == "triage_agent" and isinstance(last_msg, ToolCallSummaryMessage):
                 return "multimodal_creator"
             if last_msg.source == "multimodal_creator":
-                return "assistant"
+                return "main_assistant"     
             return None
         
         self.selector_func = custom_selector_func
 
-        self.agents = [triage_agent, multimodal_creator, assistant]
+        self.agents = [triage_agent, multimodal_creator, main_assistant]
         
         return self._get_agent_configuration()
