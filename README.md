@@ -76,6 +76,7 @@ The orchestrator selects the agent strategy based on the `AUTOGEN_ORCHESTRATION_
 The orchestrator supports the following strategies, each tailored to specific needs:
 
 - **Classical RAG**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
+- **Classical RAG**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
 
 - **Multimodal RAG**: In the `multimodal_rag` strategy, user queries are searched in an index containing text content and image descriptions. The system combines text and images to generate a comprehensive response.
 
@@ -83,7 +84,7 @@ The orchestrator supports the following strategies, each tailored to specific ne
 
 - **NL2SQL Fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
 
-- **NL2SQL Fewshot Scales**: This strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
+- **NL2SQL Fewshot Scaled**: The `nl2sql_fewshot_scaled` strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
 
 ### How to Add and Configure you Own Agent Strategies
 
@@ -238,10 +239,7 @@ This section provides configuration steps for the various NL2SQL strategies. The
 
 **Data Dictionary**
 
-The Data Dictionary is essential for SQL generation, providing a structured reference for database tables and columns. If you're using the standard `nl2sql` strategy, simply review and update the `config/data_dictionary.json` file as needed.
-
-> [!NOTE]
-> If you prefer, you can create a `config/data_dictionary.custom.json` file, which will override the example file in `config/data_dictionary.json`.
+The Data Dictionary is essential for SQL generation, providing a structured reference for database tables and columns. If you're using the standard `nl2sql` strategy, simply review and update the `config/nl2sql/data_dictionary.json` file as needed.
 
 If you're using the `nl2sql_fewshot_scaled` strategy, the `data_dictionary.json` file will not be used. In this case, you'll need to create the JSON files differently to be indexed. You can refer to the examples in [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) to see how to set up the table and column files for AI Search indexing.
 

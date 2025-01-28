@@ -38,6 +38,8 @@ import logging
 import logging.config
 from orchestration import Orchestrator
 import asyncio
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 LOGGING_CONFIG = {
     'version': 1,
@@ -233,13 +235,11 @@ def display_answer(answer):
 
         # Extract keys with default messages if keys are missing
         assistant_answer = answer.get("answer", "No answer provided.")
-        assistant_reasoning = answer.get("reasoning", "No reasoning provided.")
-        assistant_sql_query = answer.get("sql_query", "No SQL query provided.")
+        assistant_reasoning = answer.get("thoughts", "No reasoning provided.")
         assistant_data_points = answer.get("data_points", "No data points provided.")
 
         print(f"{BLUE}Answer: {assistant_answer}{RESET}")
         print(f"{BLUE}Reasoning: {GREY}{assistant_reasoning}{RESET}")
-        print(f"{BLUE}SQL Query: {GREY}{assistant_sql_query}{RESET}")
         print(f"{BLUE}Data Points: {GREY}{assistant_data_points}{RESET}")
 
     except json.JSONDecodeError as e:

@@ -35,18 +35,14 @@ class NL2SQLBaseStrategy(BaseAgentStrategy, ABC):
         # Subclasses should set self.strategy_type
 
         # Load the data dictionary JSON file
-        custom_data_dictionary_path = 'config/data_dictionary.custom.json'
-        default_data_dictionary_path = 'config/data_dictionary.json'
+        default_data_dictionary_path = 'config/nl2sql/data_dictionary.json'
 
         # Check for the custom data dictionary file first
-        if os.path.exists(custom_data_dictionary_path):
-            data_dictionary_path = custom_data_dictionary_path
-            logging.info(f"[data_dictionary] Using custom data dictionary: {custom_data_dictionary_path}")
-        elif os.path.exists(default_data_dictionary_path):
+        if os.path.exists(default_data_dictionary_path):
             data_dictionary_path = default_data_dictionary_path
-            logging.info(f"[data_dictionary] Using default data dictionary: {default_data_dictionary_path}")
+            logging.info(f"[nl2sql_base_agent_strategy] Using data dictionary: {default_data_dictionary_path}")
         else:
-            logging.error("[data_dictionary] Data dictionary file not found.")
+            logging.error("[nl2sql_base_agent_strategy] Data dictionary file not found.")
             raise FileNotFoundError("Data dictionary file not found.")
 
         with open(data_dictionary_path, 'r') as f:
