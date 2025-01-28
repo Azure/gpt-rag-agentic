@@ -25,7 +25,6 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
 
         self.max_rounds = 20
 
-
         def get_schema_info(table_name: Optional[str] = None, column_name: Optional[str] = None) -> SchemaInfo:
             return self._get_schema_info(table_name, column_name)
 
@@ -40,10 +39,10 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
 
         # Create Assistant Agent
         conversation_summary = await self._summarize_conversation(history)
-        assistant_prompt = await self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
-        assistant = AssistantAgent(
-            name="assistant",
-            system_message=assistant_prompt,
+        sql_agent_prompt = await self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
+        sql_agent = AssistantAgent(
+            name="sql_agent",
+            system_message=sql_agent_prompt,
             model_client=self._get_model_client(), 
             tools=[get_schema_info, validate_sql_query, get_all_tables_info, execute_sql_query, get_today_date, get_time],
             reflect_on_tool_use=True
@@ -63,20 +62,18 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
             Selects the next agent based on the source of the last message.
             
             Transition Rules:
-               assistant -> advisor             
-               advisor -> assistant
+               user -> sql_agent
+               sql_agent -> None (SelectorGroupChat will handle transition)
             """
             last_msg = messages[-1]
-            last_source = last_msg.source
-
-            if last_source == "user":
-                return "assistant"
+            if last_msg.source == "user":
+                return "sql_agent"
             else:
-                return None       
+                return None                  
         
         self.selector_func = custom_selector_func
 
         # Return agent configuration
-        self.agents = [assistant, chat_closure]
+        self.agents = [sql_agent, chat_closure]
         
         return self._get_agent_configuration()

@@ -1,10 +1,13 @@
 import logging
+import json
 import os
-import re
 import time
 import uuid
 from datetime import datetime
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
+from tools import get_data_points_from_chat_log
 from autogen_agentchat.teams import SelectorGroupChat
 from connectors import CosmosDBClient
 from .agent_strategy_factory import AgentStrategyFactory
@@ -22,13 +25,13 @@ class Orchestrator:
         orchestration_strategy = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag').replace('-', '_')
         self.agent_strategy = AgentStrategyFactory.get_strategy(orchestration_strategy)
 
-    async def answer(self, ask: str, include_metadata: bool = True) -> dict:
+    async def answer(self, ask: str) -> dict:
         start_time = time.time()
         conversation, history = await self._get_or_create_conversation()
         agent_configuration = await self._create_agents_with_strategy(history)
-        answer_dict = await self._initiate_group_chat(agent_configuration, ask, include_metadata)
+        answer_dict = await self._initiate_group_chat(agent_configuration, ask)
         response_time = time.time() - start_time
-        await self._update_conversation(conversation, ask, answer_dict, response_time)
+        await self._update_conversation_history(conversation, ask, answer_dict, response_time)
         logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")
         return answer_dict
 
@@ -45,30 +48,63 @@ class Orchestrator:
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
         return await self.agent_strategy.create_agents(history, self.client_principal)
 
-    async def _initiate_group_chat(self, agent_configuration: dict, ask: str, include_metadata: bool) -> dict:
+    async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
+        
+        answer_dict = {
+            "conversation_id": self.conversation_id, 
+            "answer": "",
+            "thoughts": "",
+            "data_points": []
+        }
+
         try:
             logging.info(f"[orchestrator] {self.short_id} Creating group chat via SelectorGroupChat.")
+
+            # 01. Create Group Chat            
             group_chat = SelectorGroupChat(
                 participants=agent_configuration["agents"],
                 model_client=agent_configuration["model_client"],
                 termination_condition=agent_configuration["termination_condition"],
                 selector_func=agent_configuration["selector_func"],
             )
+
+            # 02. Run Group Chat            
             result = await group_chat.run(task=ask)
             final_answer = result.messages[-1].content if result.messages else "No answer generated."
-            if final_answer.endswith(agent_configuration['terminate_message']):
-                final_answer = final_answer[:-len(agent_configuration['terminate_message'])].strip()
-            answer_dict = {"conversation_id": self.conversation_id, "answer": final_answer}
-            if include_metadata:
-                chat_log = self._get_chat_log(result.messages)
-                data_points = self._get_data_points(chat_log)
-                answer_dict.update({"thoughts": chat_log, "data_points": data_points})
+
+            # 03. Format Output  
+            # 03.01 Update data points from retrieval if available in chat log
+            chat_log = self._get_chat_log(result.messages)
+            answer_dict["data_points"] =  get_data_points_from_chat_log(chat_log)
+            chat_log_formatted = self._print_chat_log(chat_log)
+            logging.info(f"[orchestrator] {self.short_id} Chat log:\n{chat_log_formatted}")
+
+            # 03.02 Remove termination message if present
+            terminate_msg = agent_configuration.get('terminate_message', '')
+            if terminate_msg and final_answer.endswith(terminate_msg):
+                final_answer = final_answer[:-len(terminate_msg)].strip()  
+
+            # 03.03 Update answer and thoughts
+            # In some cases, the response may be a JSON, so we attempt to parse it to obtain 
+            # the 'answer' and 'thoughts'. In other cases, the response is a simple string.
+            try:
+                parsed_json = json.loads(final_answer)
+                if isinstance(parsed_json, dict):
+                    answer_dict["answer"] = parsed_json.get("answer", parsed_json)
+                    answer_dict["thoughts"] = parsed_json.get("thoughts", "")
+            except json.JSONDecodeError:
+                # final_answer is a plain string, keep it as-is
+                answer_dict["answer"] = final_answer
+                pass
+
+            if answer_dict["thoughts"] == "":
+                answer_dict["thoughts"] = chat_log_formatted
+
             return answer_dict
+
         except Exception as e:
             logging.error(f"[orchestrator] {self.short_id} An error occurred: {str(e)}", exc_info=True)
-            answer_dict = {"conversation_id": self.conversation_id, "answer": f"We encountered an issue processing your request. Please try again later. Error {str(e)}"}
-            if include_metadata:
-                answer_dict.update({"thoughts": [], "data_points": []})
+            answer_dict["answer"] =  f"We encountered an issue processing your request. Please try again later. Error {str(e)}"
             return answer_dict
 
     def _get_chat_log(self, messages):
@@ -81,39 +117,40 @@ class Orchestrator:
                 return obj
             else:
                 return repr(obj)
-
         chat_log = []
         for msg in messages:
             safe_content = make_serializable(msg.content)
             chat_log.append({"speaker": msg.source, "message_type": msg.type, "content": safe_content})
         return chat_log
 
-    def _get_data_points(self, chat_log):
-        data_points = []
-        call_id_map = {}
-        allowed_extensions = {'vtt', 'xlsx', 'xls', 'pdf', 'png', 'jpeg', 'jpg', 'bmp', 'tiff', 'docx', 'pptx'}
-        extension_pattern = "|".join(allowed_extensions)
-        pattern = rf'[\w\-.]+\.(?:{extension_pattern}): .*?(?=(?:[\w\-.]+\.(?:{extension_pattern})\:)|$)'
 
-        for msg in chat_log:
-            if msg["message_type"] == "ToolCallRequestEvent":
-                content = msg["content"][0]
-                call_id = content.split("id='")[1].split("',")[0]
-                call_id_map[call_id] = None
-            elif msg["message_type"] == "ToolCallExecutionEvent":
-                content = msg["content"][0]
-                call_id = content.split("call_id='")[1].split("')")[0]
-                if call_id in call_id_map:
+    def _print_chat_log(self, chat_log):
+        result = []
+        max_length = 400
+        ellipsis = "..."
+        
+        for item in chat_log:
+            item_str = json.dumps(item, ensure_ascii=False)
+            
+            if len(item_str) > max_length:
+                # Calculate the number of characters to keep from the start and end
+                # Subtract the length of the ellipsis from max_length
+                chars_to_keep = max_length - len(ellipsis)
+                half_length = chars_to_keep // 2
+                
+                # In case of odd number, keep the extra character at the start
+                start = item_str[:half_length + (chars_to_keep % 2)]
+                end = item_str[-half_length:]
+                truncated_str = f"{start}{ellipsis}{end}"
+            else:
+                truncated_str = item_str
+            
+            result.append(truncated_str + "\n")
+        
+        final_string = "".join(result)
+        return final_string
 
-                    content_match = re.search(r"content='(.*?)',", content)
-                    if content_match:
-                        data = content_match.group(1)
-                        entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
-                        data_points.extend(entries)
-                        
-        return data_points
-
-    async def _update_conversation(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):
+    async def _update_conversation_history(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):
         logging.info(f"[orchestrator] {self.short_id} Updating conversation.")
         history = conversation.get('history', [])
         history.append({"role": "user", "content": ask})

@@ -141,7 +141,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
 
     async def create_agents(self, history, client_principal=None):
         """
-        Classic RAG creation strategy that creates the basic agents and registers functions.
+        Multimodal RAG creation strategy that creates the basic agents and registers functions.
         
         Parameters:
         - history: The conversation history, which will be summarized to provide context for the assistant's responses.
@@ -177,36 +177,49 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         multimodal_creator = MultimodalMessageCreator("multimodal_creator", multimodal_rag_message_prompt)
 
         # Assistant Agent
-        assistant = AssistantAgent(
-            name="assistant",
-            system_message="""You are a helpful assistant. After answering the question, say TERMINATE to end the conversation.""",
+        main_assistant = AssistantAgent(
+            name="main_assistant",
+            system_message="You are a helpful assistant who always includes the word ANSWERED at the end of your responses.",
             model_client=self._get_model_client(),
             reflect_on_tool_use=True    
         )
 
-        user_proxy = UserProxyAgent("user_proxy")
+        # Create chat closure agent
+        chat_closure_prompt = await self._read_prompt("chat_closure")
+        chat_closure = AssistantAgent(
+            name="chat_closure",
+            system_message=chat_closure_prompt,
+            model_client=self._get_model_client(),
+            reflect_on_tool_use=True
+        )
 
         # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
         # self.max_rounds = 8
         # self.terminate_message = "TERMINATE"
 
         def custom_selector_func(messages):
+            """
+            Selects the next agent based on the source of the last message.
+            
+            Transition Rules:
+                user -> triage_agent
+                triage_agent (ToolCallSummaryMessage) -> multimodal_creator
+                multimodal_creator -> assistant
+                Other -> None (SelectorGroupChat will handle transition)
+            """            
             last_msg = messages[-1]
-
             if last_msg.source == "user":
                 return "triage_agent"
-            
             if last_msg.source == "triage_agent" and isinstance(last_msg, ToolCallSummaryMessage):
                 return "multimodal_creator"
-
             if last_msg.source == "multimodal_creator":
-                return "assistant"
-
-            # otherwise fallback
-            return "user_proxy"
+                return "main_assistant" 
+            if last_msg.source in ["main_assistant", "triage_agent"]:
+                return "chat_closure"                 
+            return None
         
         self.selector_func = custom_selector_func
 
-        self.agents = [triage_agent, multimodal_creator, assistant, user_proxy]
+        self.agents = [triage_agent, multimodal_creator, main_assistant, chat_closure]
         
         return self._get_agent_configuration()
