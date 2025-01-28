@@ -1,10 +1,20 @@
-import logging
 import json
+import logging
 import os
-import time
 import azure.functions as func
-
 from orchestration import Orchestrator
+
+
+###############################################################################
+# Logging Configuration
+###############################################################################
+
+default_log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+autogen_log_level = os.getenv('AUTOGEN_LOG_LEVEL', 'WARNING').upper()
+
+logging.basicConfig(level=getattr(logging, default_log_level))
+logging.getLogger('autogen_core').setLevel(getattr(logging, autogen_log_level))
+logging.getLogger('autogen_agentchat').setLevel(getattr(logging, autogen_log_level))
 
 ###############################################################################
 # Pipeline Functions
@@ -12,7 +22,6 @@ from orchestration import Orchestrator
 
 app = func.FunctionApp()
 
-        
 ###################################################################################
 # Orchestator function (HTTP Triggered by AI Search)
 ###################################################################################
@@ -21,6 +30,8 @@ app = func.FunctionApp()
 @app.route(route="orc", auth_level=func.AuthLevel.FUNCTION)
 async def orc(req: func.HttpRequest) -> func.HttpResponse:
     try:
+        logging.info("Logging initialized with LOG_LEVEL: %s and AUTOGEN_LOG_LEVEL: %s", default_log_level, autogen_log_level)
+
         req_body = req.get_json()
 
         # Get input parameters
@@ -59,4 +70,3 @@ async def orc(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
-

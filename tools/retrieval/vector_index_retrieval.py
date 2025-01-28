@@ -225,3 +225,61 @@ async def multimodal_vector_index_retrieve(
         "texts": text_results,
         "images": image_urls
     })
+
+
+def get_data_points_from_chat_log(chat_log: list) -> list:
+    # Regex patterns
+    request_call_id_pattern = re.compile(r"id='([^']+)'")
+    request_function_name_pattern = re.compile(r"name='([^']+)'")
+    exec_call_id_pattern = re.compile(r"call_id='([^']+)'")
+    exec_content_pattern = re.compile(r"content='(.+?)', call_id=", re.DOTALL)
+    
+    # Allowed file extensions
+    allowed_extensions = ['vtt', 'xlsx', 'xls', 'pdf', 'docx', 'pptx', 'png', 'jpeg', 'jpg', 'bmp', 'tiff']
+    
+    # Filename pattern: matches "filename.ext: ..." until the next filename or end of string
+    filename_pattern = re.compile(
+        rf"([^\s:]+\.(?:{'|'.join(allowed_extensions)})\s*:\s*.*?)(?=[^\s:]+\.(?:{'|'.join(allowed_extensions)})\s*:|$)",
+        re.IGNORECASE | re.DOTALL
+    )
+
+    relevant_call_ids = set()
+    data_points = []
+
+    for msg in chat_log:
+        if msg["message_type"] == "ToolCallRequestEvent":
+            # Check if this request is for 'vector_index_retrieve_wrapper'
+            content = msg["content"][0]
+            call_id_match = request_call_id_pattern.search(content)
+            function_name_match = request_function_name_pattern.search(content)
+            if call_id_match and function_name_match:
+                if function_name_match.group(1) == "vector_index_retrieve_wrapper":
+                    relevant_call_ids.add(call_id_match.group(1))
+
+        elif msg["message_type"] == "ToolCallExecutionEvent":
+            # If this execution corresponds to a relevant call_id, parse filenames
+            content = msg["content"][0]
+            call_id_match = exec_call_id_pattern.search(content)
+            if call_id_match and call_id_match.group(1) in relevant_call_ids:
+                content_part_match = exec_content_pattern.search(content)
+                if not content_part_match:
+                    continue
+                content_part = content_part_match.group(1)
+
+                # Try parsing as JSON first
+                try:
+                    parsed = json.loads(content_part)
+                    texts = parsed.get("texts", [])
+                except json.JSONDecodeError:
+                    # If not JSON, strip out any "images" section and treat the rest as raw text
+                    texts = [re.split(r'["\']images["\']\s*:\s*\[', content_part, 1, re.IGNORECASE)[0]]
+
+                for text in texts:
+                    # Unescape characters and extract filenames
+                    text = bytes(text, "utf-8").decode("unicode_escape")
+                    for match in filename_pattern.findall(text):
+                        extracted = match.strip(" ,\\\"").lstrip("[").rstrip("],")
+                        if extracted:
+                            data_points.append(extracted)
+                            
+    return data_points

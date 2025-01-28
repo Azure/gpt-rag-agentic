@@ -179,9 +179,18 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         # Assistant Agent
         main_assistant = AssistantAgent(
             name="main_assistant",
-            system_message="You are a helpful assistant, you always include the word TERMINATE in your answers.",
+            system_message="You are a helpful assistant who always includes the word ANSWERED at the end of your responses.",
             model_client=self._get_model_client(),
             reflect_on_tool_use=True    
+        )
+
+        # Create chat closure agent
+        chat_closure_prompt = await self._read_prompt("chat_closure")
+        chat_closure = AssistantAgent(
+            name="chat_closure",
+            system_message=chat_closure_prompt,
+            model_client=self._get_model_client(),
+            reflect_on_tool_use=True
         )
 
         # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
@@ -204,11 +213,13 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
             if last_msg.source == "triage_agent" and isinstance(last_msg, ToolCallSummaryMessage):
                 return "multimodal_creator"
             if last_msg.source == "multimodal_creator":
-                return "main_assistant"     
+                return "main_assistant" 
+            if last_msg.source in ["main_assistant", "triage_agent"]:
+                return "chat_closure"                 
             return None
         
         self.selector_func = custom_selector_func
 
-        self.agents = [triage_agent, multimodal_creator, main_assistant]
+        self.agents = [triage_agent, multimodal_creator, main_assistant, chat_closure]
         
         return self._get_agent_configuration()
