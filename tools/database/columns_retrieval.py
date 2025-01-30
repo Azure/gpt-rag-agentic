@@ -6,7 +6,6 @@ import os
 import time
 import logging
 import requests
-import json  # Import json for structured output
 
 def columns_retrieval(
     table_name: Annotated[str, "The name of the table for which columns are to be retrieved"],

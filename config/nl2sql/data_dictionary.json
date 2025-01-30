@@ -1,5 +1,6 @@
 {
     "SalesLT.Product": {
+      "datasource": "adventureworks",
       "description_long": "Products sold or used in the manufacturing of sold products.",
       "description_short": "Contains details of products, including product identifiers, pricing, and attributes.",
       "columns": {
@@ -23,6 +24,7 @@
       }
     },
     "SalesLT.ProductDescription": {
+      "datasource": "adventureworks",      
       "description_long": "Product descriptions in several languages.",
       "description_short": "Contains descriptions for products, with multilingual support.",
       "columns": {
@@ -33,6 +35,7 @@
       }
     },
     "SalesLT.ProductModel": {
+      "datasource": "adventureworks",      
       "description_long": "Defines product models with related catalog descriptions.",
       "description_short": "Contains information related to product models and their descriptions.",
       "columns": {
@@ -44,6 +47,7 @@
       }
     },
     "SalesLT.ProductCategory": {
+      "datasource": "adventureworks",      
       "description_long": "High-level product categorization.",
       "description_short": "Contains categories for products, including parent-child relationships.",
       "columns": {
@@ -55,6 +59,7 @@
       }
     },
     "SalesLT.Customer": {
+      "datasource": "adventureworks",      
       "description_long": "Customer information.",
       "description_short": "Contains personal and business information related to customers.",
       "columns": {
@@ -76,6 +81,7 @@
       }
     },
     "SalesLT.Address": {
+      "datasource": "adventureworks",      
       "description_long": "Street address information for customers.",
       "description_short": "Contains information related to customer addresses.",
       "columns": {
@@ -91,6 +97,7 @@
       }
     },
     "SalesLT.SalesOrderDetail": {
+      "datasource": "adventureworks",      
       "description_long": "Individual products associated with a specific sales order. See SalesOrderHeader.",
       "description_short": "Details of each product line item associated with a sales order.",
       "columns": {
@@ -106,6 +113,7 @@
       }
     },
     "SalesLT.SalesOrderHeader": {
+      "datasource": "adventureworks",      
       "description_long": "General sales order information.",
       "description_short": "Contains details about sales orders, including shipping and financial data.",
       "columns": {

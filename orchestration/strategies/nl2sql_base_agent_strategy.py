@@ -8,6 +8,8 @@ from .base_agent_strategy import BaseAgentStrategy
 from typing import Optional, List, Dict, Union
 from pydantic import BaseModel
 
+# >> TODO: adaptar nl2sql para suportar DataSourcesList
+
 class SchemaInfo(BaseModel):
     table_name: Optional[str] = None
     description_long: Optional[str] = None

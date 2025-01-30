@@ -1,7 +1,7 @@
 {
   "fact_sale": {
       "description": "Sales fact table containing details of transactions including products, customers, sales locations, and pricing.",
-      "source": "sales_star_schema",
+      "datasource": "wwi_sales_star_schema",
       "columns": {
           "SaleKey": "Primary key for sales transactions.",
           "CityKey": "Foreign key referencing the sales city.",
@@ -27,6 +27,137 @@
           "Year": "Transaction year (e.g., 2000).",
           "Quarter": "Transaction quarter (1-4).",
           "Month": "Transaction month (1-12)."
+      }
+  },
+  "dimension_city": {
+      "description": "City dimension table containing details of locations associated with sales and customers.",
+      "datasource": "wwi_sales_star_schema",
+      "columns": {
+          "CityKey": "Primary key for city records.",
+          "WWICityID": "Identifier for the city in the worldwide database.",
+          "City": "Name of the city.",
+          "StateProvince": "State or province where the city is located.",
+          "Country": "Country where the city is located.",
+          "Continent": "Continent where the city is located.",
+          "SalesTerritory": "Sales territory associated with the city.",
+          "Region": "Geographical region of the city.",
+          "Subregion": "Subregion within the region.",
+          "Location": "Geographical coordinates (POINT format: latitude, longitude).",
+          "LatestRecordedPopulation": "Most recent recorded population count.",
+          "ValidFrom": "Start date when this record became valid (datetime).",
+          "ValidTo": "End date when this record is valid (datetime, default: 12/31/9999 for current records).",
+          "LineageKey": "Key used for tracking data lineage."
+      }
+  },
+  "dimension_customer": {
+      "description": "Customer dimension table containing details of customers, their categories, and billing information.",
+      "datasource": "wwi_sales_star_schema",
+      "columns": {
+          "CustomerKey": "Primary key for customer records.",
+          "WWICustomerID": "Identifier for the customer in the worldwide database.",
+          "Customer": "Name of the customer or business.",
+          "BillToCustomer": "Parent customer account to which billing is assigned.",
+          "Category": "Customer category, e.g., 'Novelty Shop'.",
+          "BuyingGroup": "Buying group associated with the customer, if applicable.",
+          "PrimaryContact": "Name of the primary contact person for the customer.",
+          "PostalCode": "Postal code associated with the customer location.",
+          "ValidFrom": "Start date when this record became valid (datetime).",
+          "ValidTo": "End date when this record is valid (datetime, default: 12/31/9999 for current records).",
+          "LineageKey": "Key used for tracking data lineage."
+      }
+  },
+  "dimension_date": {
+      "description": "Date dimension table containing calendar, fiscal, and ISO-related date attributes.",
+      "datasource": "wwi_sales_star_schema",
+      "columns": {
+          "Date": "Full date value (datetime).",
+          "DayNumber": "Day number within the month.",
+          "Day": "Day of the month as an integer.",
+          "Month": "Full month name (e.g., 'February').",
+          "ShortMonth": "Abbreviated month name (e.g., 'Feb').",
+          "CalendarMonthNumber": "Month number within the calendar year (1-12).",
+          "CalendarMonthLabel": "Calendar month label including year (e.g., 'CY2009-Feb').",
+          "CalendarYear": "Calendar year (e.g., 2009).",
+          "CalendarYearLabel": "Formatted calendar year label (e.g., 'CY2009').",
+          "FiscalMonthNumber": "Month number within the fiscal year (varies based on fiscal calendar).",
+          "FiscalMonthLabel": "Formatted fiscal month label (e.g., 'FY2009-Feb').",
+          "FiscalYear": "Fiscal year (e.g., 2009).",
+          "FiscalYearLabel": "Formatted fiscal year label (e.g., 'FY2009').",
+          "ISOWeekNumber": "ISO standard week number within the year (1-53)."
+      }
+  },
+  "dimension_employee": {
+      "description": "Employee dimension table containing employee details and sales role information.",
+      "datasource": "wwi_sales_star_schema",
+      "columns": {
+          "EmployeeKey": "Primary key for employee records.",
+          "WWIEmployeeID": "Identifier for the employee in the worldwide database.",
+          "Employee": "Full name of the employee.",
+          "PreferredName": "Preferred or commonly used name of the employee.",
+          "IsSalesperson": "Indicates if the employee is a salesperson (boolean: True/False).",
+          "ValidFrom": "Start date when this record became valid (datetime).",
+          "ValidTo": "End date when this record is valid (datetime, default: 12/31/9999 for current records).",
+          "LineageKey": "Key used for tracking data lineage."
+      }
+  },
+  "dimension_stock_item": {
+      "description": "Stock item dimension table containing details of products available for sale, including packaging, pricing, and inventory attributes.",
+      "datasource": "wwi_sales_star_schema",
+      "columns": {
+          "StockItemKey": "Primary key for stock item records.",
+          "WWIStockItemID": "Identifier for the stock item in the worldwide database.",
+          "StockItem": "Name or description of the stock item.",
+          "Color": "Color of the stock item (N/A if not applicable).",
+          "SellingPackage": "Selling package type, e.g., 'Bag', 'Pair', 'Packet'.",
+          "BuyingPackage": "Buying package type, e.g., 'Carton', 'Packet'.",
+          "Brand": "Brand of the stock item (N/A if not applicable).",
+          "Size": "Size of the stock item (e.g., '250g', 'XL', 'L', 'M').",
+          "LeadTimeDays": "Number of days required for stock replenishment.",
+          "QuantityPerOuter": "Number of items per outer package.",
+          "IsChillerStock": "Indicates if the item requires chilled storage (boolean: True/False).",
+          "Barcode": "Barcode identifier for the stock item (N/A if not applicable).",
+          "TaxRate": "Applicable tax rate (percentage).",
+          "UnitPrice": "Price per unit of the stock item.",
+          "RecommendedRetailPrice": "Suggested retail price per unit.",
+          "TypicalWeightPerUnit": "Typical weight of a single unit of the item.",
+          "ValidFrom": "Start date when this record became valid (datetime).",
+          "ValidTo": "End date when this record is valid (datetime, default: 12/31/9999 for current records).",
+          "LineageKey": "Key used for tracking data lineage."
+      }
+  },
+  "aggregate_sale_by_date_city": {
+      "description": "Aggregated sales data by date and city, including revenue, tax, and profit summaries.",
+      "datasource": "wwi_sales_aggregated_data",
+      "columns": {
+          "Date": "Transaction date (datetime).",
+          "CalendarMonthLabel": "Formatted calendar month label (e.g., 'CY2000-Jan').",
+          "Day": "Day of the month.",
+          "ShortMonth": "Abbreviated month name (e.g., 'Jan').",
+          "CalendarYear": "Year of the transaction.",
+          "City": "City where the sale occurred.",
+          "StateProvince": "State or province of the city.",
+          "SalesTerritory": "Sales territory associated with the city.",
+          "SumOfTotalExcludingTax": "Total sales amount before tax.",
+          "SumOfTaxAmount": "Total tax amount collected.",
+          "SumOfTotalIncludingTax": "Total sales amount including tax.",
+          "SumOfProfit": "Total profit from sales."
+      }
+  },
+  "aggregate_sale_by_date_employee ": {
+      "description": "Aggregated sales data by date and employee, including revenue, tax, and profit summaries.",
+      "datasource": "wwi_sales_aggregated_data",
+      "columns": {
+          "Date": "Transaction date (datetime).",
+          "CalendarMonthLabel": "Formatted calendar month label (e.g., 'CY2000-Mar').",
+          "Day": "Day of the month.",
+          "Month": "Full month name (e.g., 'March').",
+          "Year": "Year of the transaction.",
+          "PreferredName": "Preferred or commonly used name of the employee.",
+          "Employee": "Full name of the employee.",
+          "SumOfTotalExcludingTax": "Total sales amount before tax.",
+          "SumOfTaxAmount": "Total tax amount collected.",
+          "SumOfTotalIncludingTax": "Total sales amount including tax.",
+          "SumOfProfit": "Total profit from sales."
       }
   }
 }

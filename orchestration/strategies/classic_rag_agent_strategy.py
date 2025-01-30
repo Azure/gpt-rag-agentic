@@ -3,7 +3,7 @@ from typing_extensions import Annotated
 from tools import get_time, get_today_date, vector_index_retrieve
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import CLASSIC_RAG
-from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
+from autogen_agentchat.agents import AssistantAgent
         
 class ClassicRAGAgentStrategy(BaseAgentStrategy):
 

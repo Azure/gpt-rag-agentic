@@ -3,7 +3,7 @@ from typing_extensions import Annotated, Dict, Any
 from tools import get_time, get_today_date, multimodal_vector_index_retrieve
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import MULTIMODAL_RAG
-from autogen_agentchat.agents import BaseChatAgent, UserProxyAgent
+from autogen_agentchat.agents import BaseChatAgent
 from connectors import BlobClient
 
 import requests, json
@@ -163,7 +163,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
             return await multimodal_vector_index_retrieve(input, self._generate_security_ids(client_principal))
         
         # Retrieval Prompt
-        triage_prompt = await self._read_prompt("multimodal_triage_agent", {"conversation_summary": conversation_summary})
+        triage_prompt = await self._read_prompt("triage_agent", {"conversation_summary": conversation_summary})
         triage_agent = AssistantAgent(
             name="triage_agent",
             system_message=triage_prompt,

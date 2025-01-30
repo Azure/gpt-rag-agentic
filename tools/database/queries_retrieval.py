@@ -7,8 +7,17 @@ import logging
 import requests
 import json  # Import json for structured output
 
+import os
+import json
+import time
+import logging
+import requests
+from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
+from typing import Annotated
+
 def queries_retrieval(
-    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
+    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
+    datasource: Annotated[str, "Datasource name"] = None,
 ) -> Annotated[str, "The output is a JSON string with the search results containing question, query, selected_tables, selected_columns, and reasoning"]:
     aoai = AzureOpenAIClient()
 
@@ -48,6 +57,13 @@ def queries_retrieval(
             "select": "question, query, selected_tables, selected_columns, reasoning",
             "top": search_top_k
         }
+        
+        # Add filter for datasource if provided
+        if datasource:
+            # Ensure proper escaping of quotes if datasource contains them
+            safe_datasource = datasource.replace("'", "''")
+            body["filter"] = f"datasource eq '{safe_datasource}'"
+
         if search_approach == TERM_SEARCH_APPROACH:
             body["search"] = search_query
         elif search_approach == VECTOR_SEARCH_APPROACH:
@@ -81,7 +97,7 @@ def queries_retrieval(
         response = requests.post(search_endpoint, headers=headers, json=body)
         status_code = response.status_code
         text = response.text
-        json_response = response.json()  # Renamed to avoid shadowing built-in json module
+        json_response = response.json()
         if status_code >= 400:
             error_message = f'Status code: {status_code}.'
             if text:
