@@ -2,14 +2,23 @@ import logging
 import os
 import requests
 import time
-from typing import Optional
-from typing_extensions import Annotated
+from typing import Optional, Annotated
 
 from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
 from connectors import AzureOpenAIClient
 
 from .types import QueryItem, QueriesRetrievalResult
 
+
+import logging
+import os
+import requests
+import time
+from typing import Optional
+from typing_extensions import Annotated
+
+from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
+from connectors import AzureOpenAIClient
 
 def queries_retrieval(
     input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
@@ -25,6 +34,7 @@ def queries_retrieval(
     Returns:
         QueriesRetrievalResult: A model containing search results where each result includes
                                 question, query, selected_tables, selected_columns, and reasoning.
+                                If an error occurs, the 'error' field is populated.
     """
     aoai = AzureOpenAIClient()
 
@@ -32,12 +42,10 @@ def queries_retrieval(
     TERM_SEARCH_APPROACH = 'term'
     HYBRID_SEARCH_APPROACH = 'hybrid'
 
-    # Customize the search parameters
-    search_index = os.getenv('AZURE_SEARCH_INDEX', 'queries')
+    search_index = os.getenv('NL2SQL_QUERIES_INDEX', 'nl2sql-queries')
     search_approach = os.getenv('AZURE_SEARCH_APPROACH', HYBRID_SEARCH_APPROACH)
     search_top_k = 3
 
-    # Semantic configuration
     use_semantic = os.getenv('AZURE_SEARCH_USE_SEMANTIC', "false").lower() == "true"
     semantic_search_config = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG', 'my-semantic-config')
     search_service = os.getenv('AZURE_SEARCH_SERVICE')
@@ -45,6 +53,7 @@ def queries_retrieval(
 
     search_results = []
     search_query = input
+    error_message = None  # Initialize an error placeholder
 
     try:
         credential = ChainedTokenCredential(
@@ -60,15 +69,12 @@ def queries_retrieval(
         azureSearchKey = credential.get_token("https://search.azure.com/.default").token
 
         logging.info(f"[ai_search] Querying Azure AI Search. Search query: {search_query}")
-        # Prepare body with the desired fields
         body = {
             "select": "question, query, selected_tables, selected_columns, reasoning",
             "top": search_top_k
         }
         
-        # Add filter for datasource if provided
         if datasource:
-            # Ensure proper escaping of quotes if datasource contains them
             safe_datasource = datasource.replace("'", "''")
             body["filter"] = f"datasource eq '{safe_datasource}'"
 
@@ -111,22 +117,17 @@ def queries_retrieval(
         json_response = response.json()
 
         if status_code >= 400:
-            error_message = f'Status code: {status_code}.'
-            if text:
-                error_message += f" Error: {text}."
-            logging.error(f"[ai_search] Error {status_code} when searching documents. {error_message}")
+            error_message = f"Status code: {status_code}. Error: {text if text else 'Unknown error'}."
+            logging.error(f"[ai_search] {error_message}")
         else:
             if json_response.get('value'):
                 logging.info(f"[ai_search] {len(json_response['value'])} documents retrieved")
                 for doc in json_response['value']:
-                    # Extract the desired fields, handling missing fields gracefully
                     question = doc.get('question', '')
                     query = doc.get('query', '')
                     selected_tables = doc.get('selected_tables', [])
                     selected_columns = doc.get('selected_columns', [])
                     reasoning = doc.get('reasoning', '')
-
-                    # Append the extracted information as a dictionary
                     search_results.append({
                         "question": question,
                         "query": query,
@@ -144,6 +145,7 @@ def queries_retrieval(
         error_message = str(e)
         logging.error(f"[ai_search] Error when getting the answer: {error_message}")
 
-    # Convert the list of dictionaries into a list of QueryItem objects
     query_items = [QueryItem(**result) for result in search_results]
-    return QueriesRetrievalResult(results=query_items)
+
+    # Return result with possible error message
+    return QueriesRetrievalResult(results=query_items, error=error_message)

@@ -1,7 +1,7 @@
 # Database AI Search Index Retrieval Models
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 class QueryItem(BaseModel):
     """
@@ -25,10 +25,11 @@ class QueriesRetrievalResult(BaseModel):
     Represents the overall result for queries retrieval.
 
     Attributes:
-        results: A list of query retrieval results.
+        results (List[QueryItem]): A list of query retrieval results.
+        error (Optional[str]): An error message, if any. Defaults to None.
     """
     results: List[QueryItem] = Field(..., description="A list of query retrieval results")
-
+    error: Optional[str] = Field(None, description="Error message if query fails")
 
 
 class ColumnItem(BaseModel):
@@ -45,8 +46,11 @@ class ColumnsRetrievalResult(BaseModel):
     
     Attributes:
         columns: A list of ColumnItem objects.
+        error (Optional[str]): An error message, if any. Defaults to None.        
     """
     columns: List[ColumnItem] = Field(..., description="List of columns with their details")
+    error: Optional[str] = Field(None, description="Error message if query fails")
+
 
 # For tables_retrieval
 class TableRetrievalItem(BaseModel):
@@ -62,6 +66,7 @@ class TablesRetrievalResult(BaseModel):
 
     Attributes:
         tables: A list of TableRetrievalItem objects.
+        error (Optional[str]): An error message, if any. Defaults to None.
     """
     tables: List[TableRetrievalItem] = Field(..., description="List of tables with details")
-
+    error: Optional[str] = Field(None, description="Error message if query fails")

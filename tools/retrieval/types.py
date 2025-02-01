@@ -3,31 +3,33 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Union
 
-# For vector_index_retrieve
 class VectorIndexRetrievalResult(BaseModel):
     """
     Represents the result of a vector index retrieval operation.
 
     Attributes:
-        result: A string containing the search results.
+        result (str): A string containing the search results.
+        error (Optional[str]): An error message, if any. Defaults to None.
     """
     result: str = Field(..., description="Search result string from vector index retrieval")
+    error: Optional[str] = Field(None, description="Error message if query fails")
 
 
-# For multimodal_vector_index_retrieve
 class MultimodalVectorIndexRetrievalResult(BaseModel):
     """
     Represents the result of a multimodal vector index retrieval.
 
     Attributes:
-        texts: A list of text snippets retrieved.
-        images: A list where each element is a list of image URLs corresponding to a document.
+        texts (List[str]): A list of text snippets retrieved.
+        images (List[List[str]]): A list where each element is a list of image URLs corresponding to a document.
+        error (Optional[str]): An error message, if any. Defaults to None.
     """
     texts: List[str] = Field(..., description="List of text snippets retrieved")
     images: List[List[str]] = Field(
         ...,
         description="List of lists of image URLs; each inner list corresponds to a document's related images"
     )
+    error: Optional[str] = Field(None, description="Error message if query fails")
 
 
 # (Optional) For get_data_points_from_chat_log

@@ -7,9 +7,10 @@ import time
 import logging
 import requests
 from .types import ColumnsRetrievalResult, ColumnItem
+from typing import List, Optional
 
 def columns_retrieval(
-    datasource: Annotated[str, "Target datasource"],        
+    datasource: Annotated[str, "Target datasource"],
     table_name: Annotated[str, "Target table"],
     user_ask: Annotated[str, "The user's query or request that may influence the column retrieval"]
 ) -> ColumnsRetrievalResult:
@@ -22,7 +23,9 @@ def columns_retrieval(
         user_ask (str): The user's query or request that may influence the column retrieval.
 
     Returns:
-        ColumnsRetrievalResult: An object containing a list of columns. Each column includes 'table_name', 'column_name', and 'description'.
+        ColumnsRetrievalResult: An object containing a list of columns. 
+                                Each column includes 'table_name', 'column_name', and 'description'.
+                                If an error occurs, the 'error' field is populated.
     """
     aoai = AzureOpenAIClient()
 
@@ -31,7 +34,7 @@ def columns_retrieval(
     HYBRID_SEARCH_APPROACH = 'hybrid'
 
     # Customize the search parameters
-    search_index = os.getenv('AZURE_SEARCH_INDEX', 'columns')
+    search_index = os.getenv('NL2SQL_COLUMNS_INDEX', 'nl2sql-columns')    
     search_approach = os.getenv('AZURE_SEARCH_APPROACH', HYBRID_SEARCH_APPROACH)
     search_top_k = 100
 
@@ -41,29 +44,37 @@ def columns_retrieval(
     search_service = os.getenv('AZURE_SEARCH_SERVICE')
     search_api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2024-07-01')
 
+    # Prepare variables
     search_results: List[ColumnItem] = []
     search_query = f"{user_ask} table:{table_name}"
+    error_message: Optional[str] = None  # Initialize an error placeholder
+
     try:
+        # Acquire a token credential
         credential = ChainedTokenCredential(
             ManagedIdentityCredential(),
             AzureCliCredential()
         )
         start_time = time.time()
         logging.info(f"[ai_search] Generating question embeddings. Search query: {search_query}")
+
+        # Generate embeddings for the user query
         embeddings_query = aoai.get_embeddings(search_query)
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished generating question embeddings. {response_time} seconds")
+        logging.info(f"[ai_search] Finished generating question embeddings in {response_time} seconds")
 
-        azureSearchKey = credential.get_token("https://search.azure.com/.default")
-        azureSearchKey = azureSearchKey.token
+        azureSearchKey = credential.get_token("https://search.azure.com/.default").token
 
         logging.info(f"[ai_search] Querying Azure AI Search. Search query: {search_query}")
-        # Prepare the body with the desired fields and filters (table_name and datasource)
+        # Prepare the body with the desired fields and filters
         body = {
             "select": "table_name, column_name, description",
-            "filter": f"table_name eq '{table_name}' and datasource eq '{datasource}'",  # Filter by table and datasource
+            # Filter by table and datasource
+            "filter": f"table_name eq '{table_name}' and datasource eq '{datasource}'",
             "top": search_top_k
         }
+
+        # Apply search approach
         if search_approach == TERM_SEARCH_APPROACH:
             body["search"] = user_ask
         elif search_approach == VECTOR_SEARCH_APPROACH:
@@ -82,38 +93,45 @@ def columns_retrieval(
                 "k": int(search_top_k)
             }]
 
+        # Semantic search if enabled and not using pure vector approach
         if use_semantic and search_approach != VECTOR_SEARCH_APPROACH:
             body["queryType"] = "semantic"
             body["semanticConfiguration"] = semantic_search_config
 
         headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {azureSearchKey}'
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {azureSearchKey}"
         }
 
-        search_endpoint = f"https://{search_service}.search.windows.net/indexes/{search_index}/docs/search?api-version={search_api_version}"
+        search_endpoint = (
+            f"https://{search_service}.search.windows.net/"
+            f"indexes/{search_index}/docs/search?api-version={search_api_version}"
+        )
 
+        # Make the request
         start_time = time.time()
         response = requests.post(search_endpoint, headers=headers, json=body)
         status_code = response.status_code
         text = response.text
-        json_response = response.json()  # Renamed to avoid shadowing the built-in json module
+        json_response = response.json()  # parse the JSON response
 
         if status_code >= 400:
-            error_message = f'Status code: {status_code}.'
+            # Capture the error if the response is not successful
+            error_message = f"Status code: {status_code}."
             if text:
                 error_message += f" Error: {text}."
             logging.error(f"[ai_search] Error {status_code} when searching documents. {error_message}")
         else:
-            if json_response.get('value'):
+            # Process search results
+            if json_response.get("value"):
                 logging.info(f"[ai_search] {len(json_response['value'])} documents retrieved")
-                for doc in json_response['value']:
-                    # Extract the desired fields, handling missing values gracefully
-                    col_table_name = doc.get('table_name', '')
-                    column_name = doc.get('column_name', '')
-                    description = doc.get('description', '')
+                for doc in json_response["value"]:
+                    # Extract fields safely
+                    col_table_name = doc.get("table_name", "")
+                    column_name = doc.get("column_name", "")
+                    description = doc.get("description", "")
                     
-                    # Create a ColumnItem object and append it to search_results
+                    # Create a ColumnItem object and append
                     column_item = ColumnItem(
                         table_name=col_table_name,
                         column_name=column_name,
@@ -121,14 +139,15 @@ def columns_retrieval(
                     )
                     search_results.append(column_item)
             else:
-                logging.info(f"[ai_search] No documents retrieved")
+                logging.info("[ai_search] No documents retrieved")
 
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished querying Azure AI Search. {response_time} seconds")
+        logging.info(f"[ai_search] Finished querying Azure AI Search in {response_time} seconds")
 
     except Exception as e:
+        # Capture any exception
         error_message = str(e)
         logging.error(f"[ai_search] Error when getting the answer: {error_message}")
 
-    # Wrap the results in a ColumnsRetrievalResult and return
-    return ColumnsRetrievalResult(columns=search_results)
+    # Return the results wrapped in ColumnsRetrievalResult (including any error message)
+    return ColumnsRetrievalResult(columns=search_results, error=error_message)
