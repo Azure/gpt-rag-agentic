@@ -40,10 +40,6 @@
     "AZURE_STORAGE_ACCOUNT": "You Azure Storage Account",
     "AZURE_STORAGE_CONTAINER: "documents",
 
-    "SQL_DATABASE_SERVER": "Your SQL Database Server URL.",
-    "SQL_DATABASE_NAME": "Your SQL Database Name.",
-    "SQL_DATABASE_UID": "",
-
     "AUTOGEN_ORCHESTRATION_STRATEGY": "classic_rag"
   }
 }

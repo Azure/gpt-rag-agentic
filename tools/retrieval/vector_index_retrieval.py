@@ -8,17 +8,31 @@ import logging
 import requests
 import json
 
+from .types import (
+    VectorIndexRetrievalResult,
+    MultimodalVectorIndexRetrievalResult,
+    DataPointsResult,
+)
+
+
 async def vector_index_retrieve(
-    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
+    input: Annotated[
+        str, "An optimized query string based on the user's ask and conversation history, when available"
+    ],
     security_ids: str = 'anonymous'
-) -> Annotated[str, "The output is a string with the search results"]:
+) -> Annotated[
+    VectorIndexRetrievalResult, "A Pydantic model containing the search results as a string"
+]:
+    """
+    Performs a vector search against Azure Cognitive Search and returns the results wrapped in a Pydantic model.
+    """
     aoai = AzureOpenAIClient()
 
     search_top_k = os.getenv('AZURE_SEARCH_TOP_K', 3)
     search_approach = os.getenv('AZURE_SEARCH_APPROACH', 'hybrid')
     semantic_search_config = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG', 'my-semantic-config')
     search_service = os.getenv('AZURE_SEARCH_SERVICE')
-    search_index = os.getenv('AZURE_SEARCH_INDEX', 'ragindex')	
+    search_index = os.getenv('AZURE_SEARCH_INDEX', 'ragindex')
     search_api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2024-07-01')
     use_semantic = os.getenv('AZURE_SEARCH_USE_SEMANTIC', 'false').lower() == 'true'
 
@@ -30,9 +44,9 @@ async def vector_index_retrieve(
     search_query = input
     try:
         credential = ChainedTokenCredential(
-                ManagedIdentityCredential(),
-                AzureCliCredential()
-            )
+            ManagedIdentityCredential(),
+            AzureCliCredential()
+        )
         start_time = time.time()
         logging.info(f"[vector_index_retrieve] generating question embeddings. search query: {search_query}")
         embeddings_query = aoai.get_embeddings(search_query)
@@ -42,7 +56,7 @@ async def vector_index_retrieve(
         azureSearchKey = azureSearchKey.token
 
         logging.info(f"[vector_index_retrieve] querying azure ai search. search query: {search_query}")
-        # prepare body
+        # Prepare body for the search request
         body = {
             "select": "title, content, url, filepath, chunk_id",
             "top": search_top_k
@@ -65,7 +79,7 @@ async def vector_index_retrieve(
                 "k": int(search_top_k)
             }]
 
-        if use_semantic == "true" and search_approach != VECTOR_SEARCH_APPROACH:
+        if use_semantic and search_approach != VECTOR_SEARCH_APPROACH:
             body["queryType"] = "semantic"
             body["semanticConfiguration"] = semantic_search_config
 
@@ -82,19 +96,23 @@ async def vector_index_retrieve(
             'Authorization': f'Bearer {azureSearchKey}'
         }
 
-        search_endpoint = f"https://{search_service}.search.windows.net/indexes/{search_index}/docs/search?api-version={search_api_version}"
+        search_endpoint = (
+            f"https://{search_service}.search.windows.net/indexes/{search_index}/docs/search"
+            f"?api-version={search_api_version}"
+        )
 
         start_time = time.time()
         response = requests.post(search_endpoint, headers=headers, json=body)
         status_code = response.status_code
-        text = response.text
-        json =response.json()    
+        response_text = response.text
+        json_data = response.json()
         if status_code >= 400:
-            logging.error(f"[vector_index_retrieve] error {response.status_code}: {response.text}")
+            logging.error(f"[vector_index_retrieve] error {status_code}: {response_text}")
         else:
-            if json['value']:
-                logging.info(f"[vector_index_retrieve] {len(json['value'])} documents retrieved")
-                for doc in json['value']:
+            if json_data.get('value'):
+                logging.info(f"[vector_index_retrieve] {len(json_data['value'])} documents retrieved")
+                for doc in json_data['value']:
+                    # Append file path and cleaned content
                     search_results.append(doc['filepath'] + ": " + doc['content'].strip() + "\n")
             else:
                 logging.info(f"[vector_index_retrieve] No documents retrieved")
@@ -106,8 +124,9 @@ async def vector_index_retrieve(
         error_message = str(e)
         logging.error(f"[vector_index_retrieve] error when getting the answer {error_message}")
 
-    sources =  ' '.join(search_results)
-    return sources
+    sources = ' '.join(search_results)
+    return VectorIndexRetrievalResult(result=sources)
+
 
 def replace_image_filenames_with_urls(content: str, related_images: list) -> str:
     """
@@ -120,24 +139,30 @@ def replace_image_filenames_with_urls(content: str, related_images: list) -> str
         content = content.replace(image_filename, image_url)
     return content
 
+
 async def multimodal_vector_index_retrieve(
-    input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
+    input: Annotated[
+        str, "An optimized query string based on the user's ask and conversation history, when available"
+    ],
     security_ids: str = 'anonymous'
-) -> Annotated[str, "The output is a string with the search results containing retrieved documents including text and images"]:
+) -> Annotated[
+    MultimodalVectorIndexRetrievalResult,
+    "A Pydantic model containing the search results with separate lists for texts and images"
+]:
     """
-    Variation of vector_index_retrieve that fetches text + related images from the search index
-    Returns a dictionary with separate lists for text snippets and image URLs.
+    Variation of vector_index_retrieve that fetches text and related images from the search index.
+    Returns the results wrapped in a Pydantic model with separate lists for texts and images.
     """
     aoai = AzureOpenAIClient()
 
-    # Acquire your environment variables
+    # Acquire environment variables
     search_top_k = int(os.getenv('AZURE_SEARCH_TOP_K', 3))
     search_approach = os.getenv('AZURE_SEARCH_APPROACH', 'vector')  # or 'hybrid'
     semantic_search_config = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG', 'my-semantic-config')
     search_service = os.getenv('AZURE_SEARCH_SERVICE')
-    search_index = os.getenv('AZURE_SEARCH_INDEX', 'ragindex')	
+    search_index = os.getenv('AZURE_SEARCH_INDEX', 'ragindex')
     search_api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2024-07-01')
-    use_semantic = (os.getenv('AZURE_SEARCH_USE_SEMANTIC', 'false').lower() == 'true')
+    use_semantic = os.getenv('AZURE_SEARCH_USE_SEMANTIC', 'false').lower() == 'true'
 
     logging.info(f"[multimodal_vector_index_retrieve] user input: {input}")
 
@@ -171,12 +196,11 @@ async def multimodal_vector_index_retrieve(
         ]
     }
 
-    # If you want semantic search layering on top of vector, adjust below
     if use_semantic and search_approach != "vector":
         body["queryType"] = "semantic"
         body["semanticConfiguration"] = semantic_search_config
 
-    # Restrict results by security filters (if any).
+    # Apply security filter
     filter_str = (
         f"metadata_security_id/any(g:search.in(g, '{security_ids}')) "
         "or not metadata_security_id/any()"
@@ -201,42 +225,46 @@ async def multimodal_vector_index_retrieve(
         resp = requests.post(search_url, headers=headers, json=body)
         response_time = round(time.time() - start_time, 2)
         logging.info(f"[multimodal_vector_index_retrieve] Finished querying Azure AI search. {response_time} seconds")
-        
+
         if resp.status_code >= 400:
             logging.error(f"[multimodal_vector_index_retrieve] error {resp.status_code}: {resp.text}")
         else:
             json_data = resp.json()
             for doc in json_data.get('value', []):
-                # Extract and process content
-                content = replace_image_filenames_with_urls(doc.get('content', ''), doc.get('relatedImages', []))
-                
-                # Extract image URLs
+                # Process content and replace image filenames with URLs
+                content = replace_image_filenames_with_urls(
+                    doc.get('content', ''),
+                    doc.get('relatedImages', [])
+                )
+
+                # Extract image URLs from content using regex
                 doc_image_urls = re.findall(r'<figure>(https?://\S+)</figure>', content)
                 image_urls.append(doc_image_urls)
 
-                # Replace <figure>http://domain.com</figure> pattern by <img src="http://domain.com">
-                content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)                
+                # Replace <figure>...</figure> with <img src="...">
+                content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)
 
-                text_results.append(doc.get('filepath', '') + ": " + content.strip())     
+                text_results.append(doc.get('filepath', '') + ": " + content.strip())
     except Exception as e:
         logging.error(f"[multimodal_vector_index_retrieve] Exception in retrieval: {e}")
 
-    return json.dumps({
-        "texts": text_results,
-        "images": image_urls
-    })
+    return MultimodalVectorIndexRetrievalResult(texts=text_results, images=image_urls)
 
 
-def get_data_points_from_chat_log(chat_log: list) -> list:
+def get_data_points_from_chat_log(chat_log: list) -> DataPointsResult:
+    """
+    Parses a chat log to extract data points (e.g., filenames with extension) from tool call events.
+    Returns a Pydantic model containing the list of extracted data points.
+    """
     # Regex patterns
     request_call_id_pattern = re.compile(r"id='([^']+)'")
     request_function_name_pattern = re.compile(r"name='([^']+)'")
     exec_call_id_pattern = re.compile(r"call_id='([^']+)'")
     exec_content_pattern = re.compile(r"content='(.+?)', call_id=", re.DOTALL)
-    
+
     # Allowed file extensions
     allowed_extensions = ['vtt', 'xlsx', 'xls', 'pdf', 'docx', 'pptx', 'png', 'jpeg', 'jpg', 'bmp', 'tiff']
-    
+
     # Filename pattern: matches "filename.ext: ..." until the next filename or end of string
     filename_pattern = re.compile(
         rf"([^\s:]+\.(?:{'|'.join(allowed_extensions)})\s*:\s*.*?)(?=[^\s:]+\.(?:{'|'.join(allowed_extensions)})\s*:|$)",
@@ -271,7 +299,7 @@ def get_data_points_from_chat_log(chat_log: list) -> list:
                     parsed = json.loads(content_part)
                     texts = parsed.get("texts", [])
                 except json.JSONDecodeError:
-                    # If not JSON, strip out any "images" section and treat the rest as raw text
+                    # If not JSON, remove any "images" section and treat the rest as raw text
                     texts = [re.split(r'["\']images["\']\s*:\s*\[', content_part, 1, re.IGNORECASE)[0]]
 
                 for text in texts:
@@ -281,5 +309,5 @@ def get_data_points_from_chat_log(chat_log: list) -> list:
                         extracted = match.strip(" ,\\\"").lstrip("[").rstrip("],")
                         if extracted:
                             data_points.append(extracted)
-                            
-    return data_points
+
+    return DataPointsResult(data_points=data_points)

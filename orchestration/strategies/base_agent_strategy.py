@@ -20,7 +20,7 @@ class BaseAgentStrategy:
         # Autogen agent configuration (base to be overridden)
         self.agents = []
         self.terminate_message = "TERMINATE"
-        self.max_rounds = 8
+        self.max_rounds = int(os.getenv('MAX_ROUNDS', 8))
         self.selector_func = None
 
     async def create_agents(self, history, client_principal=None):
@@ -58,7 +58,7 @@ class BaseAgentStrategy:
     def _get_terminate_message(self):
         return self.terminate_message
 
-    def _get_model_client(self):
+    def _get_model_client(self, response_format=None):
         """
         Set up the configuration for the Azure OpenAI language model client.
 
@@ -78,7 +78,8 @@ class BaseAgentStrategy:
             azure_ad_token_provider=token_provider,
             api_version=self.api_version,
             temperature=self.temperature,
-            max_tokens=self.max_tokens
+            max_tokens=self.max_tokens,
+            response_format=response_format
         )
 
     def _get_termination_condition(self):

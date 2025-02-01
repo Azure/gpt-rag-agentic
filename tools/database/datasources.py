@@ -1,43 +1,29 @@
-import logging
-import json
-import os
-from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Union
-from pydantic import BaseModel
+from .types import DataSourcesList
+from connectors import CosmosDBClient
 
-class DataSourceInfo(BaseModel):
-    datasource_name: Optional[str] = None
-    description: Optional[str] = None
-    type: Optional[str] = None
-    database: Optional[str] = None    
-    error: Optional[str] = None
+async def get_all_datasources_info() -> DataSourcesList:
+    """
+    Retrieve a list of all datasources.
+    Returns a DataSourcesList object.
+    """
+    # 1. Pull all documents from the `datasources` container.
+    cosmosdb = CosmosDBClient()
+    documents = await cosmosdb.list_documents("datasources")
 
-def get_data_sources_info(self, table_name=None, column_name=None) -> SchemaInfo:
-    """
-    Retrieve schema information from the data dictionary.
-    If table_name is provided, returns the table description and columns.
-    If column_name is provided, returns the column description.
-    """
-    if table_name:
-        table_info = self.data_dictionary.get(table_name)
-        if table_info:
-            return SchemaInfo(
-                table_name=table_name,
-                description_long=table_info.get("description_long"),
-                description_short=table_info.get("description_short"),
-                columns=table_info.get("columns")
-            )
-        else:
-            return SchemaInfo(error=f"Table '{table_name}' not found in data dictionary.")
-    elif column_name:
-        for table, info in self.data_dictionary.items():
-            columns = info["columns"]
-            if column_name in columns:
-                return SchemaInfo(
-                    table_name=table,
-                    column_name=column_name,
-                    column_description=columns[column_name]
-                )
-        return SchemaInfo(error=f"Column '{column_name}' not found in data dictionary.")
-    else:
-        return SchemaInfo(error="Please provide either 'table_name' or 'column_name'.")
+    datasources_info = []
+
+    # 2. Process each document.
+    for doc in documents:
+        # Create a new record whose "datasource" is the doc's "id"
+        record = {"id": doc.get("id")}
+
+        # Copy over all fields except the Cosmos internal ones (those starting with `_`)
+        # and except `id`, which we already used as "datasource".
+        for key, value in doc.items():
+            if not key.startswith("_") and key != "id":
+                record[key] = value
+
+        datasources_info.append(record)
+
+    # 3. Return as DataSourcesList
+    return DataSourcesList(datasources=datasources_info)

@@ -82,3 +82,25 @@ $searchServiceName='Azure AI Search service name'  # Name of your Azure AI Searc
 # Assign Search Index Data Reader role
 az role assignment create --role "Search Index Data Reader" --assignee $principalId --scope /subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Search/searchServices/$searchServiceName
 ``` 
+
+
+### How to check what roles are assigned to CosmosDB?
+
+
+#### Bash
+```bash
+# Set variables for Cosmos DB role assignment
+resourceGroupName='your resource group name'  # Name of your resource group
+cosmosDbaccountName='CosmosDB Service name'   # Name of your CosmosDB account
+
+az cosmosdb sql role assignment list --account-name $cosmosDbaccountName --resource-group $resourceGroupName
+``` 
+
+#### PowerShell
+```powershell
+# Set variables for Cosmos DB role assignment
+$resourceGroupName='your resource group name'  # Name of your resource group
+$cosmosDbaccountName='CosmosDB Service name'   # Name of your CosmosDB account
+
+az cosmosdb sql role assignment list --account-name $cosmosDbaccountName --resource-group $resourceGroupName
+``` 

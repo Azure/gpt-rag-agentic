@@ -97,19 +97,28 @@ class Orchestrator:
         allowed_extensions = {'vtt', 'xlsx', 'xls', 'pdf', 'png', 'jpeg', 'jpg', 'bmp', 'tiff', 'docx', 'pptx'}
         extension_pattern = "|".join(allowed_extensions)
         pattern = rf'[\w\-.]+\.(?:{extension_pattern}): .*?(?=(?:[\w\-.]+\.(?:{extension_pattern})\:)|$)'
-
-        for msg in chat_log:
-            if msg["message_type"] == "ToolCallRequestEvent":
-                content = msg["content"][0]
-                call_id = content.split("id='")[1].split("',")[0]
-                call_id_map[call_id] = None
-            elif msg["message_type"] == "ToolCallExecutionEvent":
-                content = msg["content"][0]
-                call_id = content.split("call_id='")[1].split("')")[0]
-                if call_id in call_id_map:
-                    data = content.split("content='")[1].rsplit("',", 1)[0]
-                    entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
-                    data_points.extend(entries)
+        if chat_log: 
+            for msg in chat_log:
+                try:
+                    if "message_type" in msg and "content" in msg and isinstance(msg["content"], list) and msg["content"]:
+                        if msg["message_type"] == "ToolCallRequestEvent":
+                            content = msg["content"][0]
+                            if "id='" in content:
+                                call_id = content.split("id='")[1].split("',")[0]
+                                call_id_map[call_id] = None
+                        elif msg["message_type"] == "ToolCallExecutionEvent":
+                            content = msg["content"][0]
+                            if "call_id='" in content:
+                                call_id = content.split("call_id='")[1].split("')")[0]
+                                if call_id in call_id_map:
+                                    if "content='" in content:
+                                        data = content.split("content='")[1].rsplit("',", 1)[0]
+                                        entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
+                                        data_points.extend(entries)
+                except Exception as e:
+                    logging.warning(f"[orchestrator] {self.short_id} Error processing message: {e}.")
+        else:
+            logging.warning(f"[orchestrator] {self.short_id} Chat log is empty or not provided.")
         return data_points
 
     async def _update_conversation(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):

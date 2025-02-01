@@ -1,9 +1,13 @@
 import os
+
+from typing import List, Optional
 from pydantic import BaseModel
+
 from autogen_agentchat.agents import AssistantAgent
 from autogen_core.tools import FunctionTool
-from .nl2sql_base_agent_strategy import NL2SQLBaseStrategy
-from ..constants import NL2SQL_FEWSHOT
+
+from .base_agent_strategy import BaseAgentStrategy
+from ..constants import CHAT_WITH_FABRIC
 from tools import (
     get_time,
     get_today_date,
@@ -16,26 +20,32 @@ from tools import (
     execute_sql_query,
 )
 
-
-## Group Chat Response Format
+## Agent Response Types
 
 class ChatGroupResponse(BaseModel):
     answer: str
     thoughts: str
 
+class DataSource(BaseModel):
+    name: str
+    description: str
+
+class TriageAgentResponse(BaseModel):
+    answer: str
+    datasources: Optional[List[DataSource]]
+
 # Agents Strategy Class
 
-class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
-
+class ChatWithFabricStrategy(BaseAgentStrategy):
+     
     def __init__(self):
-        self.strategy_type = NL2SQL_FEWSHOT
+        # Initialize the strategy type
         super().__init__()
+        self.strategy_type = CHAT_WITH_FABRIC
 
-        
     async def create_agents(self, history, client_principal=None):
-        """
-        Creates agents and registers functions for the NL2SQL single agent scenario.
-        """
+
+        conversation_summary = await self._summarize_conversation(history)
 
         # Wrapper Functions for Tools
 
@@ -65,22 +75,41 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
 
         execute_sql_query_tool = FunctionTool(
             execute_sql_query, description="Execute an SQL query and return the results."
-        )
+        )     
 
         # Agents
 
-        ## Assistant Agent
-        conversation_summary = await self._summarize_conversation(history)
-        assistant_prompt = await self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
-        assistant = AssistantAgent(
-            name="assistant",
-            system_message=assistant_prompt,
+        ## Triage Agent
+        triage_prompt = await self._read_prompt("triage_agent", {"conversation_summary": conversation_summary})
+        triage_agent = AssistantAgent(
+            name="triage_agent",
+            system_message=triage_prompt,
             model_client=self._get_model_client(), 
-            tools=[get_all_datasources_info_tool, get_schema_info_tool, validate_sql_query_tool, queries_retrieval_tool, get_all_tables_info_tool, execute_sql_query_tool, get_today_date, get_time],
+            tools=[get_all_datasources_info_tool, get_today_date, get_time],
             reflect_on_tool_use=True
         )
 
-        ## Chat closure agent
+        ## DAX Query Agent
+        dax_query_prompt = await self._read_prompt("dax_query_agent", {"conversation_summary": conversation_summary})        
+        dax_query_agent = AssistantAgent(
+            name="dax_query_agent",
+            system_message=dax_query_prompt,
+            model_client=self._get_model_client(), 
+            tools=[queries_retrieval_tool, get_all_tables_info_tool, get_schema_info_tool, execute_dax_query_tool, get_today_date, get_time],
+            reflect_on_tool_use=True
+        )
+
+        # ## SQL Query Agent 
+        # sql_query_prompt = await self._read_prompt("sql_query_agent", {"conversation_summary": conversation_summary})             
+        # sql_query_agent = AssistantAgent(
+        #     name="sql_query_agent",
+        #     system_message=sql_query_prompt,
+        #     model_client=self._get_model_client(), 
+        #     tools=[get_all_tables_info_tool, get_schema_info_tool, queries_retrieval_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
+        #     reflect_on_tool_use=True
+        # )        
+
+        ## Chat Closure Agent
         chat_closure_prompt = await self._read_prompt("chat_closure")
         chat_closure = AssistantAgent(
             name="chat_closure",
@@ -97,17 +126,19 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
             Selects the next agent based on the source of the last message.
             
             Transition Rules:
-               user -> assistant
-               assistant -> None (SelectorGroupChat will handle transition)
+               user -> Triage Agent
+               Triage Agent -> None (SelectorGroupChat will handle transition)
             """
             last_msg = messages[-1]
             if last_msg.source == "user":
-                return "assistant"
+                return "triage_agent"
             else:
-                return None     
-        
+                return None
+            
         self.selector_func = custom_selector_func
 
-        self.agents = [assistant, chat_closure]
-        
+        # self.agents = [triage_agent, dax_query_agent, sql_query_agent, chat_closure]
+        self.agents = [triage_agent, dax_query_agent, chat_closure]
+
         return self._get_agent_configuration()
+

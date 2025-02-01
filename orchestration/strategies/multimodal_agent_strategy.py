@@ -1,27 +1,33 @@
-from typing_extensions import Annotated, Dict, Any
+import base64
+import json
+import logging
+from typing import Sequence
+from typing_extensions import Annotated
 
-from tools import get_time, get_today_date, multimodal_vector_index_retrieve
+from pydantic import BaseModel
+
+from autogen_agentchat.agents import AssistantAgent, BaseChatAgent
+from autogen_agentchat.base._chat_agent import Response
+from autogen_agentchat.messages import (
+    AgentEvent,
+    ChatMessage,
+    MultiModalMessage,
+    TextMessage,
+    ToolCallSummaryMessage,
+)
+from autogen_core import CancellationToken, Image
+from autogen_core.tools import FunctionTool
+from connectors import BlobClient
+from tools import get_time, get_today_date
+from tools import multimodal_vector_index_retrieve
+from tools.retrieval.types import MultimodalVectorIndexRetrievalResult
+
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import MULTIMODAL_RAG
-from autogen_agentchat.agents import BaseChatAgent
-from connectors import BlobClient
 
-import requests, json
-from io import BytesIO
-
-import logging
-import base64
-
-import re
-import logging
-from typing import Sequence, Union, Annotated, Dict, Any
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.base._chat_agent import Response
-from autogen_agentchat.messages import TextMessage, MultiModalMessage, ToolCallExecutionEvent, ToolCallSummaryMessage
-from autogen_agentchat.messages import AgentEvent, ChatMessage
-from autogen_core import CancellationToken, Image  
-import requests
-from io import BytesIO
+class ChatGroupResponse(BaseModel):
+    answer: str
+    thoughts: str
 
 class MultimodalMessageCreator(BaseChatAgent):
     """
@@ -156,27 +162,34 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         # Conversation Summary
         conversation_summary = await self._summarize_conversation(history)
 
-        # Function closure for multimodal_vector_index_retrieve
+        # Wrapper Functions for Tools
+
         async def vector_index_retrieve_wrapper(
             input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
-        ) -> Annotated[Dict[str, Any], "The output includes separate lists of text and image URLs"]:
+        ) -> MultimodalVectorIndexRetrievalResult:
             return await multimodal_vector_index_retrieve(input, self._generate_security_ids(client_principal))
-        
-        # Retrieval Prompt
+
+        vector_index_retrieve_tool = FunctionTool(
+            vector_index_retrieve_wrapper, name="vector_index_retrieve", description="Performs a vector search using Azure AI Search fetching text and related images get relevant sources for answering the user's query."
+        )
+
+        # Agents
+
+        ## Retrieval Prompt
         triage_prompt = await self._read_prompt("triage_agent", {"conversation_summary": conversation_summary})
         triage_agent = AssistantAgent(
             name="triage_agent",
             system_message=triage_prompt,
             model_client=self._get_model_client(), 
-            tools=[vector_index_retrieve_wrapper],
+            tools=[vector_index_retrieve_tool],
             reflect_on_tool_use=False
         )
 
-        # Multimodal Message Creator
+        ## Multimodal Message Creator
         multimodal_rag_message_prompt = await self._read_prompt("multimodal_rag_message", {"conversation_summary": conversation_summary})
         multimodal_creator = MultimodalMessageCreator("multimodal_creator", multimodal_rag_message_prompt)
 
-        # Assistant Agent
+        ## Assistant Agent
         main_assistant = AssistantAgent(
             name="main_assistant",
             system_message="You are a helpful assistant who always includes the word ANSWERED at the end of your responses.",
@@ -184,17 +197,18 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
             reflect_on_tool_use=True    
         )
 
-        # Create chat closure agent
+        ## Chat Closure Agent
         chat_closure_prompt = await self._read_prompt("chat_closure")
         chat_closure = AssistantAgent(
             name="chat_closure",
             system_message=chat_closure_prompt,
-            model_client=self._get_model_client(),
-            reflect_on_tool_use=True
+            model_client=self._get_model_client(response_format=ChatGroupResponse)
         )
+        
+        # Agent Configuration
 
         # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
-        # self.max_rounds = 8
+        # self.max_rounds = int(os.getenv('MAX_ROUNDS', 8))
         # self.terminate_message = "TERMINATE"
 
         def custom_selector_func(messages):

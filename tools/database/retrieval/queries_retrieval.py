@@ -1,24 +1,31 @@
+import logging
+import os
+import requests
+import time
+from typing import Optional
 from typing_extensions import Annotated
-from connectors import AzureOpenAIClient
-from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
-import os
-import time
-import logging
-import requests
-import json  # Import json for structured output
 
-import os
-import json
-import time
-import logging
-import requests
 from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
-from typing import Annotated
+from connectors import AzureOpenAIClient
+
+from .types import QueryItem, QueriesRetrievalResult
+
 
 def queries_retrieval(
     input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
-    datasource: Annotated[str, "Datasource name"] = None,
-) -> Annotated[str, "The output is a JSON string with the search results containing question, query, selected_tables, selected_columns, and reasoning"]:
+    datasource: Annotated[Optional[str], "Datasource name"] = None,
+) -> QueriesRetrievalResult:
+    """
+    Retrieves query details from the search system based on the user's input.
+
+    Args:
+        input (str): An optimized query string based on the user's ask and conversation history.
+        datasource (str, optional): Datasource name.
+
+    Returns:
+        QueriesRetrievalResult: A model containing search results where each result includes
+                                question, query, selected_tables, selected_columns, and reasoning.
+    """
     aoai = AzureOpenAIClient()
 
     VECTOR_SEARCH_APPROACH = 'vector'
@@ -26,10 +33,11 @@ def queries_retrieval(
     HYBRID_SEARCH_APPROACH = 'hybrid'
 
     # Customize the search parameters
-    search_index = os.getenv('AZURE_SEARCH_INDEX', 'queries')	
+    search_index = os.getenv('AZURE_SEARCH_INDEX', 'queries')
     search_approach = os.getenv('AZURE_SEARCH_APPROACH', HYBRID_SEARCH_APPROACH)
     search_top_k = 3
-    # Semantic
+
+    # Semantic configuration
     use_semantic = os.getenv('AZURE_SEARCH_USE_SEMANTIC', "false").lower() == "true"
     semantic_search_config = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG', 'my-semantic-config')
     search_service = os.getenv('AZURE_SEARCH_SERVICE')
@@ -37,19 +45,19 @@ def queries_retrieval(
 
     search_results = []
     search_query = input
+
     try:
         credential = ChainedTokenCredential(
-                ManagedIdentityCredential(),
-                AzureCliCredential()
-            )
+            ManagedIdentityCredential(),
+            AzureCliCredential()
+        )
         start_time = time.time()
         logging.info(f"[ai_search] Generating question embeddings. Search query: {search_query}")
         embeddings_query = aoai.get_embeddings(search_query)
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished generating question embeddings. {response_time} seconds")
+        logging.info(f"[ai_search] Finished generating question embeddings in {response_time} seconds")
 
-        azureSearchKey = credential.get_token("https://search.azure.com/.default")
-        azureSearchKey = azureSearchKey.token
+        azureSearchKey = credential.get_token("https://search.azure.com/.default").token
 
         logging.info(f"[ai_search] Querying Azure AI Search. Search query: {search_query}")
         # Prepare body with the desired fields
@@ -91,13 +99,17 @@ def queries_retrieval(
             'Authorization': f'Bearer {azureSearchKey}'
         }
 
-        search_endpoint = f"https://{search_service}.search.windows.net/indexes/{search_index}/docs/search?api-version={search_api_version}"
+        search_endpoint = (
+            f"https://{search_service}.search.windows.net/indexes/{search_index}/docs/search"
+            f"?api-version={search_api_version}"
+        )
 
         start_time = time.time()
         response = requests.post(search_endpoint, headers=headers, json=body)
         status_code = response.status_code
         text = response.text
         json_response = response.json()
+
         if status_code >= 400:
             error_message = f'Status code: {status_code}.'
             if text:
@@ -123,14 +135,15 @@ def queries_retrieval(
                         "reasoning": reasoning
                     })
             else:
-                logging.info(f"[ai_search] No documents retrieved")
+                logging.info("[ai_search] No documents retrieved")
 
         response_time = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished querying Azure AI Search. {response_time} seconds")
+        logging.info(f"[ai_search] Finished querying Azure AI Search in {response_time} seconds")
 
     except Exception as e:
         error_message = str(e)
         logging.error(f"[ai_search] Error when getting the answer: {error_message}")
 
-    # Convert the search_results list of dictionaries to a JSON string
-    return json.dumps(search_results, indent=2)
+    # Convert the list of dictionaries into a list of QueryItem objects
+    query_items = [QueryItem(**result) for result in search_results]
+    return QueriesRetrievalResult(results=query_items)

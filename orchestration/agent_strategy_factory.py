@@ -6,7 +6,7 @@ from .strategies.nl2sql_standard_strategy import NL2SQLStandardStrategy
 from .strategies.nl2sql_fewshot_strategy import NL2SQLFewshotStrategy
 from .strategies.nl2sql_fewshot_scaled_strategy import NL2SQLFewshotScaledStrategy
 # Other Strategies
-from .strategies.chat_with_fabric import ChatWithFabricStrategy
+from .strategies.chat_with_fabric_strategy import ChatWithFabricStrategy
 
 from .constants import CLASSIC_RAG, MULTIMODAL_RAG, NL2SQL, NL2SQL_FEWSHOT, NL2SQL_FEWSHOT_SCALED, CHAT_WITH_FABRIC
 
