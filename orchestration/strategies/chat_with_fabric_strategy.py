@@ -99,15 +99,15 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             reflect_on_tool_use=True
         )
 
-        # ## SQL Query Agent 
-        # sql_query_prompt = await self._read_prompt("sql_query_agent", {"conversation_summary": conversation_summary})             
-        # sql_query_agent = AssistantAgent(
-        #     name="sql_query_agent",
-        #     system_message=sql_query_prompt,
-        #     model_client=self._get_model_client(), 
-        #     tools=[get_all_tables_info_tool, get_schema_info_tool, queries_retrieval_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
-        #     reflect_on_tool_use=True
-        # )        
+        ## SQL Query Agent 
+        sql_query_prompt = await self._read_prompt("sql_query_agent", {"conversation_summary": conversation_summary})             
+        sql_query_agent = AssistantAgent(
+            name="sql_query_agent",
+            system_message=sql_query_prompt,
+            model_client=self._get_model_client(), 
+            tools=[get_all_tables_info_tool, get_schema_info_tool, queries_retrieval_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
+            reflect_on_tool_use=True
+        )        
 
         ## Chat Closure Agent
         chat_closure_prompt = await self._read_prompt("chat_closure")
@@ -121,20 +121,31 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
 
         self.max_rounds = int(os.getenv('MAX_ROUNDS', 20))
 
+        # def custom_selector_func(messages):
+        #     """
+        #     Selects the next agent based on the source of the last message.
+            
+        #     Transition Rules:
+        #        user -> Triage Agent
+        #        Triage Agent -> None (SelectorGroupChat will handle transition)
+        #     """
+        #     last_msg = messages[-1]
+        #     if last_msg.source == "user":
+        #         return "triage_agent"
+        #     else:
+        #         return None
+            
         def custom_selector_func(messages):
             """
-            Selects the next agent based on the source of the last message.
-            
-            Transition Rules:
-               user -> Triage Agent
-               Triage Agent -> None (SelectorGroupChat will handle transition)
+            Selects the next agent based on the last message. 
             """
             last_msg = messages[-1]
+            
             if last_msg.source == "user":
                 return "triage_agent"
-            else:
-                return None
-            
+
+            return None
+
         self.selector_func = custom_selector_func
 
         # self.agents = [triage_agent, dax_query_agent, sql_query_agent, chat_closure]
