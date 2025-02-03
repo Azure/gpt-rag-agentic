@@ -24,7 +24,8 @@ class AgentStrategyFactory:
         elif strategy_type == NL2SQL_FEWSHOT:
             return NL2SQLFewshotStrategy()      
         elif strategy_type == NL2SQL_FEWSHOT_SCALED:
-            return NL2SQLFewshotScaledStrategy()   
+            return NL2SQLFewshotScaledStrategy()
+           
         # Add other strategies here as needed.
         # Example: 
         # elif strategy_type == 'custom':

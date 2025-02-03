@@ -325,7 +325,7 @@ def main():
                     "Ground Truth": ground_truth,
                     "Answer": response_data.get('answer', 'No answer provided.'),
                     "Context": response_data.get('data_points', 'No data points provided.'),
-                    "Thoughts": response_data.get('thoughts', 'No thoughts provided.'),
+                    "Reasoning": response_data.get('reasoning', 'No reasoning provided.'),
                     "Processing Time (seconds)": duration
                 }
                 f_out.write(json.dumps(output_data) + '\n')

@@ -6,6 +6,8 @@ from connectors import AzureOpenAIClient
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential, get_bearer_token_provider
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
+from autogen_core.model_context import BufferedChatCompletionContext
+from autogen_core.models import SystemMessage
 
 class BaseAgentStrategy:
     def __init__(self):
@@ -22,6 +24,7 @@ class BaseAgentStrategy:
         self.terminate_message = "TERMINATE"
         self.max_rounds = int(os.getenv('MAX_ROUNDS', 8))
         self.selector_func = None
+        self.context_buffer_size = int(os.getenv('CONTEXT_BUFFER_SIZE', 5))      
 
     async def create_agents(self, history, client_principal=None):
         """
@@ -258,3 +261,12 @@ class BaseAgentStrategy:
                 raise ValueError("strategy_type is not defined")        
             prompts_dir = "prompts" + "/" + self.strategy_type
             return prompts_dir
+
+    async def _get_model_context(self, history):
+        """
+        Add the conversation summary as the model context.
+        """        
+        history_summary = await self._summarize_conversation(history)
+        initial_messages = []
+        initial_messages.append(SystemMessage(content=f"Summary of Conversation History to Assist with Follow-Up Questions: {history_summary}"))
+        return BufferedChatCompletionContext(buffer_size=self.context_buffer_size, initial_messages=initial_messages)

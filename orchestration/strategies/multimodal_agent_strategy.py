@@ -21,13 +21,14 @@ from connectors import BlobClient
 from tools import get_time, get_today_date
 from tools import multimodal_vector_index_retrieve
 from tools.retrieval.types import MultimodalVectorIndexRetrievalResult
+from autogen_core.model_context import BufferedChatCompletionContext
 
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import MULTIMODAL_RAG
 
 class ChatGroupResponse(BaseModel):
     answer: str
-    thoughts: str
+    reasoning: str
 
 class MultimodalMessageCreator(BaseChatAgent):
     """
@@ -37,14 +38,14 @@ class MultimodalMessageCreator(BaseChatAgent):
     This agent simply scans the conversation for the tool's result, parses 
     text + image URLs, and returns a MultiModalMessage.
     """
-    def __init__(self, name: str, multimodal_rag_message_prompt: str):
+    def __init__(self, name: str, system_prompt: str, model_context: BufferedChatCompletionContext):
         super().__init__(
             name=name,
             description="An agent that creates `MultiModalMessage` objects from the results of `vector_index_retrieve_wrapper`, executed by an `AssistantAgent` called `retrieval_agent`."
         )
-        # You can track internal state here if needed.
         self._last_multimodal_result = None
-        self.multimodal_rag_message_prompt = multimodal_rag_message_prompt
+        self.system_prompt = system_prompt
+        self._model_context = model_context
 
     @property
     def produced_message_types(self):
@@ -91,7 +92,7 @@ class MultimodalMessageCreator(BaseChatAgent):
         image_urls = retrieval_data.get("images", [])
 
         # Combine text snippets into a single string
-        combined_text = self.multimodal_rag_message_prompt + "\n\n".join(texts) if texts else "No text results"
+        combined_text = self.system_prompt + "\n\n".join(texts) if texts else "No text results"
 
         # Fetch images from URLs
         image_objects = []
@@ -159,8 +160,8 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         To use a different model for an specific agent, instantiate a separate AzureOpenAIChatCompletionClient and assign it instead of using self._get_model_client().
         """
 
-        # Conversation Summary
-        conversation_summary = await self._summarize_conversation(history)
+        # Model Context
+        shared_context = await self._get_model_context(history) 
 
         # Wrapper Functions for Tools
 
@@ -175,26 +176,27 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
 
         # Agents
 
-        ## Retrieval Prompt
-        triage_prompt = await self._read_prompt("triage_agent", {"conversation_summary": conversation_summary})
+        ## Triage Prompt
+        triage_prompt = await self._read_prompt("triage_agent")
         triage_agent = AssistantAgent(
             name="triage_agent",
             system_message=triage_prompt,
             model_client=self._get_model_client(), 
             tools=[vector_index_retrieve_tool],
-            reflect_on_tool_use=False
+            reflect_on_tool_use=False,
+            model_context=shared_context
         )
 
         ## Multimodal Message Creator
-        multimodal_rag_message_prompt = await self._read_prompt("multimodal_rag_message", {"conversation_summary": conversation_summary})
-        multimodal_creator = MultimodalMessageCreator("multimodal_creator", multimodal_rag_message_prompt)
+        multimodal_rag_message_prompt = await self._read_prompt("multimodal_rag_message")
+        multimodal_creator = MultimodalMessageCreator(name="multimodal_creator", system_prompt=multimodal_rag_message_prompt, model_context=shared_context)
 
         ## Assistant Agent
         main_assistant = AssistantAgent(
             name="main_assistant",
             system_message="You are a helpful assistant who always includes the word ANSWERED at the end of your responses.",
             model_client=self._get_model_client(),
-            reflect_on_tool_use=True    
+            reflect_on_tool_use=True
         )
 
         ## Chat Closure Agent

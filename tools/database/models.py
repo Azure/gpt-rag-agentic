@@ -3,15 +3,28 @@
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Union
 
+class DataSourceItem(BaseModel):
+    """
+    Represents a data source with its type information.
+
+    Attributes:
+        name: The name of the data source.
+        description: The description of the data source.        
+        type: The type of the data source.
+    """
+    name: str
+    description: str    
+    type: str
+
 class DataSourcesList(BaseModel):
     """
     Represents a list of available data sources.
 
     Attributes:
-        datasources: A list of dictionaries containing the data source information.
+        datasources: A list of DataSourceItem instances, each containing information about a data source.
     """
-    datasources: List[Dict[str, Union[str, List[str]]]]
-
+    datasources: List[DataSourceItem]
+    
 class TableItem(BaseModel):
     """
     Represents information about a specific database table.

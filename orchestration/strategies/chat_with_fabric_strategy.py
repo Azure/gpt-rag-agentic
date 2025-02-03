@@ -1,10 +1,13 @@
 import os
+import re
 
 from typing import List, Optional
 from pydantic import BaseModel
-
-from autogen_agentchat.agents import AssistantAgent
+from autogen_agentchat.agents import AssistantAgent, SocietyOfMindAgent
+from autogen_agentchat.teams import RoundRobinGroupChat, SelectorGroupChat
 from autogen_core.tools import FunctionTool
+from autogen_agentchat.messages import TextMessage
+from autogen_agentchat.conditions import TextMentionTermination
 
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import CHAT_WITH_FABRIC
@@ -24,7 +27,7 @@ from tools import (
 
 class ChatGroupResponse(BaseModel):
     answer: str
-    thoughts: str
+    reasoning: str
 
 class DataSource(BaseModel):
     name: str
@@ -44,8 +47,9 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         self.strategy_type = CHAT_WITH_FABRIC
 
     async def create_agents(self, history, client_principal=None):
-
-        conversation_summary = await self._summarize_conversation(history)
+        
+        # Model Context
+        shared_context = await self._get_model_context(history)  
 
         # Wrapper Functions for Tools
 
@@ -77,37 +81,52 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             execute_sql_query, description="Execute an SQL query and return the results."
         )     
 
-        # Agents
+        # Agents      
 
         ## Triage Agent
-        triage_prompt = await self._read_prompt("triage_agent", {"conversation_summary": conversation_summary})
+        triage_prompt = await self._read_prompt("triage_agent")
         triage_agent = AssistantAgent(
             name="triage_agent",
             system_message=triage_prompt,
             model_client=self._get_model_client(), 
             tools=[get_all_datasources_info_tool, get_today_date, get_time],
-            reflect_on_tool_use=True
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )
-
+        
         ## DAX Query Agent
-        dax_query_prompt = await self._read_prompt("dax_query_agent", {"conversation_summary": conversation_summary})        
+        dax_query_prompt = await self._read_prompt("dax_query_agent")        
         dax_query_agent = AssistantAgent(
             name="dax_query_agent",
             system_message=dax_query_prompt,
             model_client=self._get_model_client(), 
             tools=[queries_retrieval_tool, get_all_tables_info_tool, get_schema_info_tool, execute_dax_query_tool, get_today_date, get_time],
-            reflect_on_tool_use=True
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )
 
         ## SQL Query Agent 
-        sql_query_prompt = await self._read_prompt("sql_query_agent", {"conversation_summary": conversation_summary})             
+        sql_query_prompt = await self._read_prompt("sql_query_agent")             
         sql_query_agent = AssistantAgent(
             name="sql_query_agent",
             system_message=sql_query_prompt,
             model_client=self._get_model_client(), 
-            tools=[get_all_tables_info_tool, get_schema_info_tool, queries_retrieval_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
-            reflect_on_tool_use=True
+            tools=[queries_retrieval_tool, get_all_tables_info_tool, get_schema_info_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )        
+
+        # Society Of Mind Agent (Query Agents)
+        # inner_termination = TextMentionTermination("ANSWERED")
+        # response_prompt = "Copy the content of the last agent message exactly, without mentioning any of the intermediate discussion."
+        # inner_team = RoundRobinGroupChat([dax_query_agent, sql_query_agent], termination_condition=inner_termination)
+        # inner_team = SelectorGroupChat(
+        #                 participants=[dax_query_agent, sql_query_agent],
+        #                 model_client=self._get_model_client(),
+        #                 termination_condition=inner_termination,
+        #                 max_turns=30
+        #             )
+        # query_agents = SocietyOfMindAgent("query_agents", team=inner_team, response_prompt=response_prompt, model_client=self._get_model_client())
 
         ## Chat Closure Agent
         chat_closure_prompt = await self._read_prompt("chat_closure")
@@ -118,23 +137,8 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         )
         
         # Group Chat Configuration
+        self.max_rounds = int(os.getenv('MAX_ROUNDS', 40))
 
-        self.max_rounds = int(os.getenv('MAX_ROUNDS', 20))
-
-        # def custom_selector_func(messages):
-        #     """
-        #     Selects the next agent based on the source of the last message.
-            
-        #     Transition Rules:
-        #        user -> Triage Agent
-        #        Triage Agent -> None (SelectorGroupChat will handle transition)
-        #     """
-        #     last_msg = messages[-1]
-        #     if last_msg.source == "user":
-        #         return "triage_agent"
-        #     else:
-        #         return None
-            
         def custom_selector_func(messages):
             """
             Selects the next agent based on the last message. 
@@ -144,12 +148,22 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             if last_msg.source == "user":
                 return "triage_agent"
 
+            if isinstance(last_msg, TextMessage):
+                if re.search(r"ANSWERED\.?$", last_msg.content.strip()):
+                    return "chat_closure"
+
+            if last_msg.source == "sql_query_agent" or (last_msg.source == "triage_agent" and "sql_endpoint" in last_msg.content.strip()):
+                return "sql_query_agent"
+
+            if last_msg.source == "dax_query_agent" or (last_msg.source == "triage_agent" and "semantic_model" in last_msg.content.strip()):
+                return "dax_query_agent"
+
             return None
 
         self.selector_func = custom_selector_func
 
-        # self.agents = [triage_agent, dax_query_agent, sql_query_agent, chat_closure]
-        self.agents = [triage_agent, dax_query_agent, chat_closure]
+        self.agents = [triage_agent, dax_query_agent, sql_query_agent, chat_closure]
+        # self.agents = [triage_agent, query_agents, chat_closure]
 
         return self._get_agent_configuration()
 

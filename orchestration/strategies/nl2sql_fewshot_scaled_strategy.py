@@ -21,7 +21,7 @@ from tools import (
 
 class ChatGroupResponse(BaseModel):
     answer: str
-    thoughts: str
+    reasoning: str
 
 # Agents Strategy Class
 
@@ -74,20 +74,23 @@ class NL2SQLFewshotScaledStrategy(NL2SQLBaseStrategy):
             execute_sql_query, description="Execute an SQL query and return the results."
         )
 
+        # Model Context
+        shared_context = await self._get_model_context(history) 
+
         # Agents
 
-        # Assistant Agent
-        conversation_summary = await self._summarize_conversation(history)
-        assistant_prompt = await self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
+        ## Assistant Agent
+        assistant_prompt = await self._read_prompt("nl2sql_assistant")
         assistant = AssistantAgent(
             name="assistant",
             system_message=assistant_prompt,
             model_client=self._get_model_client(), 
             tools=[get_all_datasources_info_tool, validate_sql_query_tool, queries_retrieval_tool, tables_retrieval_tool, columns_retrieval_tool, execute_sql_query_tool, get_today_date, get_time],
-            reflect_on_tool_use=True
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )
 
-        # Chat closure agent
+        ## Chat closure agent
         chat_closure_prompt = await self._read_prompt("chat_closure")
         chat_closure = AssistantAgent(
             name="chat_closure",

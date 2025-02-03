@@ -7,7 +7,7 @@ from typing import Optional, Annotated
 from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
 from connectors import AzureOpenAIClient
 
-from .types import QueryItem, QueriesRetrievalResult
+from .models import QueryItem, QueriesRetrievalResult
 
 
 import logging
@@ -22,7 +22,7 @@ from connectors import AzureOpenAIClient
 
 def queries_retrieval(
     input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"],
-    datasource: Annotated[Optional[str], "Datasource name"] = None,
+    datasource: Annotated[Optional[str], "Target datasource name"] = None,
 ) -> QueriesRetrievalResult:
     """
     Retrieves query details from the search system based on the user's input.

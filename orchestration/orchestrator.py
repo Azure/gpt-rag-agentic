@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -25,53 +26,91 @@ class Orchestrator:
         orchestration_strategy = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag').replace('-', '_')
         self.agent_strategy = AgentStrategyFactory.get_strategy(orchestration_strategy)
 
-    async def answer(self, ask: str, include_metadata: bool = True) -> dict:
+    async def answer(self, ask: str) -> dict:
         start_time = time.time()
-        conversation, history = await self._get_or_create_conversation()
+
+        # Get existing conversation or create a new one
+        conversation = await self._get_or_create_conversation()
+        history = conversation.get("history", [])
+        
+        # Create agents and initiate group chat
         agent_configuration = await self._create_agents_with_strategy(history)
-        answer_dict = await self._initiate_group_chat(agent_configuration, ask, include_metadata)
+        answer_dict = await self._initiate_group_chat(agent_configuration, ask)
+
+        # Update conversation with new chat log
+        await self._update_conversation(conversation, ask, answer_dict['answer'])
+        
         response_time = time.time() - start_time
-        await self._update_conversation(conversation, ask, answer_dict, response_time)
         logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")
         return answer_dict
 
-    async def _get_or_create_conversation(self) -> tuple:
+    async def _get_or_create_conversation(self) -> dict:
         conversation = await self.cosmosdb.get_document(self.conversations_container, self.conversation_id)
         if not conversation:
-            conversation = await self.cosmosdb.create_document(self.conversations_container, self.conversation_id)
+            new_conversation = {
+                "id": self.conversation_id,
+                "start_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "user_id": self.client_principal.get("id", "unknown"),
+                "user_name": self.client_principal.get("name", "anonymous"),
+                "conversation_id": self.conversation_id,
+                "history": []  # initialize an empty shared chat log
+            }
+            conversation = await self.cosmosdb.create_document(self.conversations_container, self.conversation_id, new_conversation)
             logging.info(f"[orchestrator] {self.short_id} Created new conversation.")
         else:
             logging.info(f"[orchestrator] {self.short_id} Retrieved existing conversation.")
-        return conversation, conversation.get('history', [])
+        return conversation
 
-    async def _create_agents_with_strategy(self, history: str) -> list:
+    async def _create_agents_with_strategy(self, history: list[dict]) -> list:
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
         return await self.agent_strategy.create_agents(history, self.client_principal)
 
-    async def _initiate_group_chat(self, agent_configuration: dict, ask: str, include_metadata: bool) -> dict:
+    async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
         try:
             logging.info(f"[orchestrator] {self.short_id} Creating group chat via SelectorGroupChat.")
+
+            # Run agent chat
             group_chat = SelectorGroupChat(
                 participants=agent_configuration["agents"],
                 model_client=agent_configuration["model_client"],
                 termination_condition=agent_configuration["termination_condition"],
-                selector_func=agent_configuration["selector_func"],
+                selector_func=agent_configuration["selector_func"]
             )
             result = await group_chat.run(task=ask)
-            final_answer = result.messages[-1].content if result.messages else "No answer generated."
-            if final_answer.endswith(agent_configuration['terminate_message']):
-                final_answer = final_answer[:-len(agent_configuration['terminate_message'])].strip()
-            answer_dict = {"conversation_id": self.conversation_id, "answer": final_answer}
-            if include_metadata:
-                chat_log = self._get_chat_log(result.messages)
-                data_points = self._get_data_points(chat_log)
-                answer_dict.update({"thoughts": chat_log, "data_points": data_points})
+
+            # Get answer, thoughts and reasoning from last message
+            reasoning = ""
+            last_message = result.messages[-1].content if result.messages else '{"answer":"No answer provided."}'
+            try:
+                message_data = json.loads(last_message)
+                answer = message_data.get("answer", "Oops! The agent team did not generate a response for the user.")
+                reasoning = message_data.get("reasoning", "")
+            except json.JSONDecodeError:
+                answer = "Oops! The agent team did not generate a response for the user."
+                logging.warning(f"[orchestrator] {self.short_id} Error: Malformed JSON. Using default values for answer and thoughts")
+
+            if answer.endswith(agent_configuration['terminate_message']):
+                answer = answer[:-len(agent_configuration['terminate_message'])].strip()
+            
+            # Get data points from chat log
+            chat_log = self._get_chat_log(result.messages)
+            data_points = self._get_data_points(chat_log)
+            
+            answer_dict = {"conversation_id": self.conversation_id, 
+                           "answer": answer,
+                           "reasoning": reasoning,                                   
+                           "thoughts": chat_log,                   
+                           "data_points": data_points}
+
             return answer_dict
+
         except Exception as e:
             logging.error(f"[orchestrator] {self.short_id} An error occurred: {str(e)}", exc_info=True)
-            answer_dict = {"conversation_id": self.conversation_id, "answer": f"We encountered an issue processing your request. Please try again later. Error {str(e)}"}
-            if include_metadata:
-                answer_dict.update({"thoughts": [], "data_points": []})
+            answer_dict = {"conversation_id": self.conversation_id, 
+                           "answer": f"We encountered an issue processing your request. Please try again later. Error {str(e)}",
+                           "reasoning": "", 
+                           "thoughts": [], 
+                           "data_points": []}
             return answer_dict
 
     def _get_chat_log(self, messages):
@@ -121,18 +160,21 @@ class Orchestrator:
             logging.warning(f"[orchestrator] {self.short_id} Chat log is empty or not provided.")
         return data_points
 
-    async def _update_conversation(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):
+    async def _update_conversation(self, conversation: dict, ask: str, answer: str):
         logging.info(f"[orchestrator] {self.short_id} Updating conversation.")
-        history = conversation.get('history', [])
-        history.append({"role": "user", "content": ask})
-        history.append({"role": "assistant", "content": answer_dict['answer']})
-        interaction = {'user_id': self.client_principal['id'], 'user_name': self.client_principal['name'], 'response_time': round(response_time, 2)}
-        interaction.update(answer_dict)
-        conversation_data = conversation.get('conversation_data', {'start_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'interactions': []})
-        conversation_data['interactions'].append(interaction)
-        conversation['conversation_data'] = conversation_data
-        conversation['history'] = history
-        await self.cosmosdb.update_document(self.conversations_container, conversation)
+        # Retrieve the existing chat_log (if any) and extend it.
+        history = conversation.get("history", [])
+        history.extend([{"speaker": "user", "content": ask},{"speaker": "assistant", "content": answer}])
+        # Create the simplified conversation document.
+        simplified_conversation = {
+            "id": self.conversation_id,
+            "start_date": conversation.get("start_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "user_id": self.client_principal.get("id", "unknown"),
+            "user_name": self.client_principal.get("name", "anonymous"),
+            "conversation_id": self.conversation_id,
+            "history": history
+        }
+        await self.cosmosdb.update_document(self.conversations_container, simplified_conversation)
         logging.info(f"[orchestrator] {self.short_id} Finished updating conversation.")
 
     def _setup_logging(self):

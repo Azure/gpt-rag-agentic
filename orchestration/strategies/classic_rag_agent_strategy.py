@@ -15,7 +15,7 @@ from ..constants import CLASSIC_RAG
 
 class ChatGroupResponse(BaseModel):
     answer: str
-    thoughts: str
+    reasoning: str
 
 class ClassicRAGAgentStrategy(BaseAgentStrategy):
 
@@ -36,6 +36,8 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         Note:
         To use a different model for an specific agent, instantiate a separate AzureOpenAIChatCompletionClient and assign it instead of using self._get_model_client().
         """
+        # Model Context
+        shared_context = await self._get_model_context(history) 
 
         # Wrapper Functions for Tools
 
@@ -52,14 +54,14 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         # Agents
 
         ## Main Assistant Agent
-        conversation_summary = await self._summarize_conversation(history)
-        assistant_prompt = await self._read_prompt("classic_rag_assistant", {"conversation_summary": conversation_summary})
+        assistant_prompt = await self._read_prompt("classic_rag_assistant")
         main_assistant = AssistantAgent(
             name="main_assistant",
             system_message=assistant_prompt,
             model_client=self._get_model_client(), 
             tools=[vector_index_retrieve_tool, get_today_date, get_time],
-            reflect_on_tool_use=True
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )
 
         ## Chat Closure Agent

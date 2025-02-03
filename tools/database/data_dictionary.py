@@ -1,5 +1,5 @@
 from typing import Annotated
-from .types import TablesList, SchemaInfo
+from .models import TablesList, SchemaInfo
 from connectors import CosmosDBClient
 
 async def get_all_tables_info(datasource: Annotated[str, "Name of the target datasource"]) -> TablesList:

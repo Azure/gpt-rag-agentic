@@ -4,7 +4,7 @@ from .retrieval.vector_index_retrieval import multimodal_vector_index_retrieve
 from .retrieval.vector_index_retrieval import get_data_points_from_chat_log
 
 # Database Tools
-from .database.types import DataSourcesList, TablesList, SchemaInfo, ValidateSQLQueryResult, ExecuteQueryResult
+from .database.models import DataSourcesList, TablesList, SchemaInfo, ValidateSQLQueryResult, ExecuteQueryResult
 from .database.retrieval.queries_retrieval import queries_retrieval
 from .database.retrieval.tables_retrieval import tables_retrieval
 from .database.retrieval.columns_retrieval import columns_retrieval

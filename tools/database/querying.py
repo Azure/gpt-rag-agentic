@@ -1,6 +1,7 @@
 import sqlparse
 from typing import Annotated
-from .types import ValidateSQLQueryResult, ExecuteQueryResult
+from .models import ValidateSQLQueryResult, ExecuteQueryResult
+from connectors import CosmosDBClient, SQLEndpointClient, SemanticModelClient, SQLDBClient
 
 def validate_sql_query(query: Annotated[str, "SQL Query"]) -> ValidateSQLQueryResult:
     """
@@ -16,18 +17,16 @@ def validate_sql_query(query: Annotated[str, "SQL Query"]) -> ValidateSQLQueryRe
     except Exception as e:
         return ValidateSQLQueryResult(is_valid=False, error=str(e))
 
-# TODO: Review/Implement this
+# TODO: Review this method implementation based on the reference and instrcutions provided in the task
 async def execute_dax_query(datasource: Annotated[str, "Datasource name"] , query: Annotated[str, "DAX Query"]) -> ExecuteQueryResult:
-    return None
     """
     Execute an DAX query and return the results.
     Returns a list of dictionaries, each representing a row.
     """
     try:
-        # TODO: get datastource info
         cosmosdb = CosmosDBClient()
-        datasource_info = await cosmosdb.get_datasource(datasources)
-        semantic_model_client = SemanticModelClient(datsource_info)
+        datasource_config = await cosmosdb.get_document('datasources', datasource)
+        semantic_model_client = SemanticModelClient(datasource_config)
         query_results = await semantic_model_client.execute(query)
         columns = [column[0] for column in query_results.description]
         rows = query_results.fetchall()
@@ -36,24 +35,21 @@ async def execute_dax_query(datasource: Annotated[str, "Datasource name"] , quer
     except Exception as e:
         return ExecuteQueryResult(error=str(e))
 
-# TODO: Implement this
+# TODO: Review this method implementation based on the reference and instrcutions provided in the task
 async def execute_sql_query(datasource: Annotated[str, "Datasource name"] , query: Annotated[str, "SQL Query"]) -> ExecuteQueryResult:
-    return None
     """
     Execute an SQL query and return the results.
     Returns a list of dictionaries, each representing a row.
     """
     try:
-
         cosmosdb = CosmosDBClient()
-        datasource_info = await cosmosdb.get_datasource(datasource)
-        sql_client = SQLEndpointClient(datsource_info)
+        datasource_config = await cosmosdb.get_document('datasources', datasource)
+        # TODO: Attention here, this could be SQLDBClient instead of SQLEndpointClient depending on the configuration verify the datasoutce type to ajust the code!
+        sql_client = SQLEndpointClient(datasource_config)
         connection = await sql_client.create_connection()
         cursor = connection.cursor()
-
         if not query.strip().lower().startswith('select'):
             return ExecuteQueryResult(error="Only SELECT statements are allowed.")
-
         cursor.execute(query)
         columns = [column[0] for column in cursor.description]
         rows = cursor.fetchall()

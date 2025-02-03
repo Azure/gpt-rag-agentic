@@ -6,7 +6,7 @@ import os
 import time
 import logging
 import requests
-from .types import ColumnsRetrievalResult, ColumnItem
+from .models import ColumnsRetrievalResult, ColumnItem
 from typing import List, Optional
 
 def columns_retrieval(

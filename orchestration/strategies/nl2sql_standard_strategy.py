@@ -21,7 +21,7 @@ from tools import (
 
 class ChatGroupResponse(BaseModel):
     answer: str
-    thoughts: str
+    reasoning: str
 
 # Agents Strategy Class
 
@@ -35,6 +35,9 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """
+
+        # Model Context
+        shared_context = await self._get_model_context(history) 
 
         ## Wrapper Functions for Tools
 
@@ -61,14 +64,14 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
         ## Agents
 
         # Assistant Agent
-        conversation_summary = await self._summarize_conversation(history)
-        sql_agent_prompt = await self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
+        sql_agent_prompt = await self._read_prompt("nl2sql_assistant")
         sql_agent = AssistantAgent(
             name="sql_agent",
             system_message=sql_agent_prompt,
             model_client=self._get_model_client(), 
             tools=[get_all_datasources_info_tool, get_schema_info_tool, validate_sql_query_tool, get_all_tables_info_tool, execute_sql_query_tool, get_today_date, get_time],
-            reflect_on_tool_use=True
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )
 
         # Create chat closure agent

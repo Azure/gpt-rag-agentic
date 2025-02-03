@@ -71,7 +71,7 @@ class CosmosDBClient:
                     logging.info(f"[cosmosdb] document {key} does not exist.")
                 return document
 
-    async def create_document(self, container, key) -> dict: 
+    async def create_document(self, container, key, body=None) -> dict: 
         async with ChainedTokenCredential(
                 ManagedIdentityCredential(),
                 AzureCliCredential()
@@ -80,7 +80,11 @@ class CosmosDBClient:
                 db = db_client.get_database_client(database=self.db_name)
                 container = db.get_container_client(container)
                 try:
-                    document = await container.create_item(body={"id": key})                    
+                    if body is None:
+                        body = {"id": key}
+                    else:
+                        body["id"] = key  # ensure the document id is set
+                    document = await container.create_item(body=body)                    
                     logging.info(f"[cosmosdb] document {key} created.")
                 except Exception as e:
                     document = None
@@ -96,10 +100,10 @@ class CosmosDBClient:
                 db = db_client.get_database_client(database=self.db_name)
                 container = db.get_container_client(container)
                 try:
-                    document = await container.replace_item(item=document, body=document)
+                    document = await container.replace_item(item=document["id"], body=document)
                     logging.info(f"[cosmosdb] document updated.")
                 except Exception as e:
                     document = None
-                    logging.info(f"[cosmosdb] could not update document.")
+                    logging.warning(f"[cosmosdb] could not update document: {e}", exc_info=True)
                 return document
             

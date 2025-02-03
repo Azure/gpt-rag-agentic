@@ -7,7 +7,7 @@ from typing import List, Optional, Annotated
 from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
 from connectors import AzureOpenAIClient
 
-from .types import TablesRetrievalResult, TableRetrievalItem
+from .models import TablesRetrievalResult, TableRetrievalItem
 
 def tables_retrieval(
     datasource: Annotated[str, "Target datasource"],

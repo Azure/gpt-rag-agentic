@@ -5,13 +5,17 @@ import struct
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from .keyvault import get_secret
 
+# TODO: Review this class implementation based on the reference and instrcutions provided in the task
 class SQLDBClient:
-    def __init__(self):
+    def __init__(self, datasource_config):
+        self.datasource_config = datasource_config
         pass
+
     async def create_connection(self):
         return await self._create_sqldatabase_connection()
 
     async def _create_sqldatabase_connection(self):
+        # TODO: dont use env variables anymore, use the configuration from cosmosdb
         server = os.environ.get('SQL_DATABASE_SERVER', 'replace_with_database_server_name')
         database = os.environ.get('SQL_DATABASE_NAME', 'replace_with_database_name')
         uid = os.environ.get('SQL_DATABASE_UID', None)
