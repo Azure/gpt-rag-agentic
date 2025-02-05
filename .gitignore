@@ -17,6 +17,7 @@ __*/*
 output.log
 responses_*.jsonl
 responses_*.xslx
+config.txt
 
 # Evaluations
 qa_flow_quality_eval.jsonl

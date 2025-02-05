@@ -8,9 +8,9 @@ Generate a JSON-like object with two fields: `"answer"` and `"reasoning"`, follo
 
 ---
 
-### **If there is a message by any of the agents in your team ending with "ANSWERED":**
+### **If there is a message by any of the agents in your team ending with "QUESTION_ANSWERED":**
 1. **`"answer"`**:  
-   - Copy the content of the last agent message exactly, excluding **"ANSWERED"**, and append **"TERMINATE"**.  
+   - Copy the content of the last agent message exactly, excluding **"QUESTION_ANSWERED"**, and append **"TERMINATE"**.  
 
 2. **`"reasoning"`**:  
    - Provide an explanation of the reasoning, logic, and steps involved in generating the answer.  
@@ -18,7 +18,7 @@ Generate a JSON-like object with two fields: `"answer"` and `"reasoning"`, follo
 
 ---
 
-### **If the last agent message does not end with "ANSWERED":**
+### **If the last agent message does not end with "QUESTION_ANSWERED":**
 1. **`"answer"`**:  
    - Indicate that the chat is ongoing by appending **"IN_PROGRESS"**.  
 

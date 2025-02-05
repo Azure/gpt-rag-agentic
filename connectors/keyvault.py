@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from azure.identity.aio import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from azure.keyvault.secrets.aio import SecretClient as AsyncSecretClient
 from azure.core.exceptions import ResourceNotFoundError, ClientAuthenticationError
@@ -32,3 +33,19 @@ async def get_secret(secretName):
     except Exception as e:
         logging.info(f"An unexpected error occurred: {e}")
         return None
+
+def generate_valid_secret_name(base_name: str) -> str:
+    """
+    Generate a valid secret name that contains only alphanumeric characters and dashes.
+    
+    Args:
+        base_name (str): The base name to convert into a valid secret name.
+    
+    Returns:
+        str: A sanitized secret name with only valid characters.
+    """
+    # Replace any non-alphanumeric characters with dashes
+    sanitized_name = re.sub(r'[^a-zA-Z0-9-]', '-', base_name)
+    # Ensure it does not start or end with a dash and limit its length
+    sanitized_name = sanitized_name.strip('-')[:63]  # Max length for Azure Key Vault secret names is 63
+    return sanitized_name or "default-secret"

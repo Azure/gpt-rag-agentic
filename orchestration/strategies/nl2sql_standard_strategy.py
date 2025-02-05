@@ -31,7 +31,7 @@ class NL2SQLStandardStrategy(NL2SQLBaseStrategy):
         self.strategy_type = NL2SQL
         super().__init__()
 
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """

@@ -24,9 +24,9 @@ class BaseAgentStrategy:
         self.terminate_message = "TERMINATE"
         self.max_rounds = int(os.getenv('MAX_ROUNDS', 8))
         self.selector_func = None
-        self.context_buffer_size = int(os.getenv('CONTEXT_BUFFER_SIZE', 5))      
+        self.context_buffer_size = int(os.getenv('CONTEXT_BUFFER_SIZE', 30))      
 
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Create agent instances for the strategy.
 

@@ -1,4 +1,4 @@
-from typing_extensions import Annotated
+from typing import Annotated
 from pydantic import BaseModel
 
 from autogen_agentchat.agents import AssistantAgent
@@ -6,7 +6,7 @@ from autogen_core.tools import FunctionTool
 
 from tools import get_time, get_today_date
 from tools import vector_index_retrieve
-from tools.retrieval.types import VectorIndexRetrievalResult
+from tools.ragindex.types import VectorIndexRetrievalResult
 
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import CLASSIC_RAG
@@ -23,7 +23,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = CLASSIC_RAG
 
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Classic RAG creation strategy that creates the basic agents and registers functions.
         

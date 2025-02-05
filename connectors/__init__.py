@@ -7,3 +7,4 @@ from .fabric import SemanticModelClient
 from .blob import BlobClient
 from .blob import BlobContainerClient
 from .keyvault import get_secret
+from .keyvault import generate_valid_secret_name              

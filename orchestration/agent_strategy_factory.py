@@ -4,11 +4,10 @@ from .strategies.multimodal_agent_strategy import MultimodalAgentStrategy
 # NL2SQL Strategies
 from .strategies.nl2sql_standard_strategy import NL2SQLStandardStrategy
 from .strategies.nl2sql_fewshot_strategy import NL2SQLFewshotStrategy
-from .strategies.nl2sql_fewshot_scaled_strategy import NL2SQLFewshotScaledStrategy
 # Other Strategies
 from .strategies.chat_with_fabric_strategy import ChatWithFabricStrategy
 
-from .constants import CLASSIC_RAG, MULTIMODAL_RAG, NL2SQL, NL2SQL_FEWSHOT, NL2SQL_FEWSHOT_SCALED, CHAT_WITH_FABRIC
+from .constants import CLASSIC_RAG, MULTIMODAL_RAG, NL2SQL, NL2SQL_FEWSHOT, CHAT_WITH_FABRIC
 
 class AgentStrategyFactory:
     @staticmethod
@@ -22,9 +21,7 @@ class AgentStrategyFactory:
         elif strategy_type == NL2SQL:
             return NL2SQLStandardStrategy()
         elif strategy_type == NL2SQL_FEWSHOT:
-            return NL2SQLFewshotStrategy()      
-        elif strategy_type == NL2SQL_FEWSHOT_SCALED:
-            return NL2SQLFewshotScaledStrategy()
+            return NL2SQLFewshotStrategy() 
            
         # Add other strategies here as needed.
         # Example: 

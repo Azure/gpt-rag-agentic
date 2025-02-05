@@ -7,7 +7,7 @@ from typing import Optional, Annotated
 from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
 from connectors import AzureOpenAIClient
 
-from .models import QueryItem, QueriesRetrievalResult
+from .types import QueryItem, QueriesRetrievalResult
 
 
 import logging
@@ -15,7 +15,7 @@ import os
 import requests
 import time
 from typing import Optional
-from typing_extensions import Annotated
+from typing import Annotated
 
 from azure.identity import ChainedTokenCredential, ManagedIdentityCredential, AzureCliCredential
 from connectors import AzureOpenAIClient

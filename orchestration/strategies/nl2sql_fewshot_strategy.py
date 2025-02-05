@@ -11,7 +11,6 @@ from tools import (
     get_all_datasources_info,
     get_all_tables_info,
     get_schema_info,
-    execute_dax_query,
     validate_sql_query,
     execute_sql_query,
 )
@@ -32,7 +31,7 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         super().__init__()
 
         
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """
@@ -57,10 +56,6 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         queries_retrieval_tool = FunctionTool(
             queries_retrieval, description="Retrieve a list of similar questions and the correspondent query, selected_tables, selected_columns and reasoning."
         )
-
-        execute_dax_query_tool = FunctionTool(
-            execute_dax_query, description="Execute an DAX query and return the results."
-        )     
 
         validate_sql_query_tool = FunctionTool(
             validate_sql_query, description="Validate the syntax of an SQL query."

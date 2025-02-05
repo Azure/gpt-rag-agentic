@@ -1,8 +1,7 @@
 import base64
 import json
 import logging
-from typing import Sequence
-from typing_extensions import Annotated
+from typing import Sequence, Annotated
 
 from pydantic import BaseModel
 
@@ -20,7 +19,7 @@ from autogen_core.tools import FunctionTool
 from connectors import BlobClient
 from tools import get_time, get_today_date
 from tools import multimodal_vector_index_retrieve
-from tools.retrieval.types import MultimodalVectorIndexRetrievalResult
+from tools.ragindex.types import MultimodalVectorIndexRetrievalResult
 from autogen_core.model_context import BufferedChatCompletionContext
 
 from .base_agent_strategy import BaseAgentStrategy
@@ -146,7 +145,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = MULTIMODAL_RAG
 
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Multimodal RAG creation strategy that creates the basic agents and registers functions.
         
@@ -194,7 +193,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         ## Assistant Agent
         main_assistant = AssistantAgent(
             name="main_assistant",
-            system_message="You are a helpful assistant who always includes the word ANSWERED at the end of your responses.",
+            system_message="You are a helpful assistant who always includes the word QUESTION_ANSWERED at the end of your responses.",
             model_client=self._get_model_client(),
             reflect_on_tool_use=True
         )

@@ -7,5 +7,5 @@ class NL2SQLBaseStrategy(BaseAgentStrategy, ABC):
         super().__init__()
     
     @abstractmethod
-    def create_agents(self, history, client_principal=None):
+    def create_agents(self, history, client_principal=None, access_token=None):
         pass

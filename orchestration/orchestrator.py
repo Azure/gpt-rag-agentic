@@ -14,9 +14,10 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 class Orchestrator:
-    def __init__(self, conversation_id: str, client_principal: dict):
+    def __init__(self, conversation_id: str, client_principal: dict = None, access_token: str = None):
         self._setup_logging()
         self.client_principal = client_principal
+        self.access_token = access_token
         self.conversation_id = self._use_or_create_conversation_id(conversation_id)
         self.short_id = self.conversation_id[:8]
         self.cosmosdb = CosmosDBClient()
@@ -63,7 +64,7 @@ class Orchestrator:
 
     async def _create_agents_with_strategy(self, history: list[dict]) -> list:
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
-        return await self.agent_strategy.create_agents(history, self.client_principal)
+        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token)
 
     async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
         try:
@@ -74,7 +75,7 @@ class Orchestrator:
                 participants=agent_configuration["agents"],
                 model_client=agent_configuration["model_client"],
                 termination_condition=agent_configuration["termination_condition"],
-                selector_func=agent_configuration["selector_func"]
+                selector_func=agent_configuration["selector_func"],
             )
             result = await group_chat.run(task=ask)
 

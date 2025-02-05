@@ -1,13 +1,12 @@
 import os
 import re
 
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from pydantic import BaseModel
-from autogen_agentchat.agents import AssistantAgent, SocietyOfMindAgent
-from autogen_agentchat.teams import RoundRobinGroupChat, SelectorGroupChat
+from autogen_agentchat.agents import AssistantAgent
 from autogen_core.tools import FunctionTool
 from autogen_agentchat.messages import TextMessage
-from autogen_agentchat.conditions import TextMentionTermination
+from tools import ExecuteQueryResult
 
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import CHAT_WITH_FABRIC
@@ -16,6 +15,7 @@ from tools import (
     get_today_date,
     queries_retrieval,
     get_all_datasources_info,
+    tables_retrieval,
     get_all_tables_info,
     get_schema_info,
     execute_dax_query,
@@ -46,12 +46,16 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = CHAT_WITH_FABRIC
 
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         
         # Model Context
         shared_context = await self._get_model_context(history)  
 
         # Wrapper Functions for Tools
+
+        tables_retrieval_tool = FunctionTool(
+            tables_retrieval, description="Retrieve a all tables that are relevant to the user question."
+        )        
 
         get_all_datasources_info_tool = FunctionTool(
             get_all_datasources_info, description="Retrieve a list of all datasources."
@@ -69,8 +73,14 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             queries_retrieval, description="Retrieve a list of similar questions and the correspondent query, selected_tables, selected_columns and reasoning."
         )
 
+        async def execute_dax_query_wrapper(
+            datasource: Annotated[str, "Target datasource"], 
+            query: Annotated[str, "DAX Query"]
+        ) -> ExecuteQueryResult:
+            return await execute_dax_query(datasource, query, access_token)
+
         execute_dax_query_tool = FunctionTool(
-            execute_dax_query, description="Execute an DAX query and return the results."
+            execute_dax_query_wrapper, name="execute_dax_query", description="Execute a DAX query and return the results."
         )     
 
         validate_sql_query_tool = FunctionTool(
@@ -78,7 +88,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         )     
 
         execute_sql_query_tool = FunctionTool(
-            execute_sql_query, description="Execute an SQL query and return the results."
+            execute_sql_query, description="Execute an SQL query against the datasource provided by the Triage Agent and return the results."
         )     
 
         # Agents      
@@ -89,7 +99,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             name="triage_agent",
             system_message=triage_prompt,
             model_client=self._get_model_client(), 
-            tools=[get_all_datasources_info_tool, get_today_date, get_time],
+            tools=[get_all_datasources_info_tool, tables_retrieval_tool, get_today_date, get_time],
             reflect_on_tool_use=True,
             model_context=shared_context
         )
@@ -117,7 +127,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         )        
 
         # Society Of Mind Agent (Query Agents)
-        # inner_termination = TextMentionTermination("ANSWERED")
+        # inner_termination = TextMentionTermination("QUESTION_ANSWERED")
         # response_prompt = "Copy the content of the last agent message exactly, without mentioning any of the intermediate discussion."
         # inner_team = RoundRobinGroupChat([dax_query_agent, sql_query_agent], termination_condition=inner_termination)
         # inner_team = SelectorGroupChat(
@@ -141,24 +151,32 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
 
         def custom_selector_func(messages):
             """
-            Selects the next agent based on the last message. 
+            Selects the next agent based on the last message.
             """
             last_msg = messages[-1]
-            
+
             if last_msg.source == "user":
                 return "triage_agent"
 
-            if isinstance(last_msg, TextMessage):
-                if re.search(r"ANSWERED\.?$", last_msg.content.strip()):
-                    return "chat_closure"
+            if isinstance(last_msg, TextMessage) and re.search(r"QUESTION_ANSWERED\.?$", last_msg.content.strip()):
+                return "chat_closure"
 
-            if last_msg.source == "sql_query_agent" or (last_msg.source == "triage_agent" and "sql_endpoint" in last_msg.content.strip()):
-                return "sql_query_agent"
+            def is_datasource_selected(source, keyword):
+                return last_msg.source == "triage_agent" and \
+                    "DATASOURCE_SELECTED" in last_msg.content.strip() and \
+                    keyword in last_msg.content.strip()
 
-            if last_msg.source == "dax_query_agent" or (last_msg.source == "triage_agent" and "semantic_model" in last_msg.content.strip()):
-                return "dax_query_agent"
+            agent_mapping = {
+                "sql_query_agent": "sql_endpoint",
+                "dax_query_agent": "semantic_model"
+            }
 
-            return None
+            for agent, keyword in agent_mapping.items():
+                if last_msg.source == agent or is_datasource_selected(last_msg.source, keyword):
+                    return agent
+
+            return "triage_agent"
+
 
         self.selector_func = custom_selector_func
 

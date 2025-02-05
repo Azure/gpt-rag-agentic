@@ -1,4 +1,4 @@
-from .models import DataSourcesList, DataSourceItem
+from .types import DataSourcesList, DataSourceItem
 from connectors import CosmosDBClient
 
 async def get_all_datasources_info() -> DataSourcesList:
@@ -16,7 +16,7 @@ async def get_all_datasources_info() -> DataSourcesList:
     for doc in documents:
         # Create a DataSourceItem with the required fields
         datasource_item = DataSourceItem(
-            name=doc.get("name", ""),
+            name=doc.get("id", ""),
             description=doc.get("description", ""),            
             type=doc.get("type", "")
         )

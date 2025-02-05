@@ -27,3 +27,6 @@ aiohttp==3.10.11
 sqlparse==0.5.1
 pyodbc==5.1.0
 teradatasql==20.0.0.17
+
+# Utility dependencies
+tenacity==9.0.0

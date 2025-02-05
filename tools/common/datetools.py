@@ -1,4 +1,4 @@
-from typing_extensions import Annotated
+from typing import Annotated
 from datetime import datetime
 
 def get_today_date() -> Annotated[str, "The output is today's date in string format"]:
