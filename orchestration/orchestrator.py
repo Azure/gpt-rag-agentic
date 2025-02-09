@@ -1,21 +1,23 @@
-import logging
 import json
+import logging
 import os
+import re
 import time
 import uuid
 from datetime import datetime
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
 
-from tools import get_data_points_from_chat_log
 from autogen_agentchat.teams import SelectorGroupChat
 from connectors import CosmosDBClient
 from .agent_strategy_factory import AgentStrategyFactory
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 class Orchestrator:
-    def __init__(self, conversation_id: str, client_principal: dict):
+    def __init__(self, conversation_id: str, client_principal: dict = None, access_token: str = None):
         self._setup_logging()
         self.client_principal = client_principal
+        self.access_token = access_token
         self.conversation_id = self._use_or_create_conversation_id(conversation_id)
         self.short_id = self.conversation_id[:8]
         self.cosmosdb = CosmosDBClient()
@@ -27,84 +29,89 @@ class Orchestrator:
 
     async def answer(self, ask: str) -> dict:
         start_time = time.time()
-        conversation, history = await self._get_or_create_conversation()
+
+        # Get existing conversation or create a new one
+        conversation = await self._get_or_create_conversation()
+        history = conversation.get("history", [])
+        
+        # Create agents and initiate group chat
         agent_configuration = await self._create_agents_with_strategy(history)
         answer_dict = await self._initiate_group_chat(agent_configuration, ask)
+
+        # Update conversation with new chat log
+        await self._update_conversation(conversation, ask, answer_dict['answer'])
+        
         response_time = time.time() - start_time
-        await self._update_conversation_history(conversation, ask, answer_dict, response_time)
         logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")
         return answer_dict
 
-    async def _get_or_create_conversation(self) -> tuple:
+    async def _get_or_create_conversation(self) -> dict:
         conversation = await self.cosmosdb.get_document(self.conversations_container, self.conversation_id)
         if not conversation:
-            conversation = await self.cosmosdb.create_document(self.conversations_container, self.conversation_id)
+            new_conversation = {
+                "id": self.conversation_id,
+                "start_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "user_id": self.client_principal.get("id", "unknown"),
+                "user_name": self.client_principal.get("name", "anonymous"),
+                "conversation_id": self.conversation_id,
+                "history": []  # initialize an empty shared chat log
+            }
+            conversation = await self.cosmosdb.create_document(self.conversations_container, self.conversation_id, new_conversation)
             logging.info(f"[orchestrator] {self.short_id} Created new conversation.")
         else:
             logging.info(f"[orchestrator] {self.short_id} Retrieved existing conversation.")
-        return conversation, conversation.get('history', [])
+        return conversation
 
-    async def _create_agents_with_strategy(self, history: str) -> list:
+    async def _create_agents_with_strategy(self, history: list[dict]) -> list:
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
-        return await self.agent_strategy.create_agents(history, self.client_principal)
+        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token)
 
     async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
-        
-        answer_dict = {
-            "conversation_id": self.conversation_id, 
-            "answer": "",
-            "thoughts": "",
-            "data_points": []
-        }
-
         try:
             logging.info(f"[orchestrator] {self.short_id} Creating group chat via SelectorGroupChat.")
 
-            # 01. Create Group Chat            
+            # Run agent chat
             group_chat = SelectorGroupChat(
                 participants=agent_configuration["agents"],
                 model_client=agent_configuration["model_client"],
                 termination_condition=agent_configuration["termination_condition"],
                 selector_func=agent_configuration["selector_func"],
             )
-
-            # 02. Run Group Chat            
             result = await group_chat.run(task=ask)
-            final_answer = result.messages[-1].content if result.messages else "No answer generated."
 
-            # 03. Format Output  
-            # 03.01 Update data points from retrieval if available in chat log
-            chat_log = self._get_chat_log(result.messages)
-            answer_dict["data_points"] =  get_data_points_from_chat_log(chat_log)
-            chat_log_formatted = self._print_chat_log(chat_log)
-            logging.info(f"[orchestrator] {self.short_id} Chat log:\n{chat_log_formatted}")
-
-            # 03.02 Remove termination message if present
-            terminate_msg = agent_configuration.get('terminate_message', '')
-            if terminate_msg and final_answer.endswith(terminate_msg):
-                final_answer = final_answer[:-len(terminate_msg)].strip()  
-
-            # 03.03 Update answer and thoughts
-            # In some cases, the response may be a JSON, so we attempt to parse it to obtain 
-            # the 'answer' and 'thoughts'. In other cases, the response is a simple string.
+            # Get answer, thoughts and reasoning from last message
+            reasoning = ""
+            last_message = result.messages[-1].content if result.messages else '{"answer":"No answer provided."}'
             try:
-                parsed_json = json.loads(final_answer)
-                if isinstance(parsed_json, dict):
-                    answer_dict["answer"] = parsed_json.get("answer", parsed_json)
-                    answer_dict["thoughts"] = parsed_json.get("thoughts", "")
+                message_data = json.loads(last_message)
+                answer = message_data.get("answer", "Oops! The agent team did not generate a response for the user.")
+                reasoning = message_data.get("reasoning", "")
             except json.JSONDecodeError:
-                # final_answer is a plain string, keep it as-is
-                answer_dict["answer"] = final_answer
-                pass
+                answer = "Oops! The agent team did not generate a response for the user."
+                logging.warning(f"[orchestrator] {self.short_id} Error: Malformed JSON. Using default values for answer and thoughts")
 
-            if answer_dict["thoughts"] == "":
-                answer_dict["thoughts"] = chat_log_formatted
+            if answer.endswith(agent_configuration['terminate_message']):
+                answer = answer[:-len(agent_configuration['terminate_message'])].strip()
+            
+            # Get data points from chat log
+            chat_log = self._get_chat_log(result.messages)
+            data_points = self._get_data_points(chat_log)
+            
+            answer_dict = {"conversation_id": self.conversation_id, 
+                           "answer": answer,
+                           "reasoning": reasoning,                                   
+                           "thoughts": chat_log,                   
+                           "data_points": data_points}
 
             return answer_dict
 
         except Exception as e:
             logging.error(f"[orchestrator] {self.short_id} An error occurred: {str(e)}", exc_info=True)
-            answer_dict["answer"] =  f"We encountered an issue processing your request. Please try again later. Error {str(e)}"
+            answer_dict = {"conversation_id": self.conversation_id, 
+                           "answer": f"We encountered an issue processing your request. Please try again later. Error {str(e)}",
+                           "reasoning": "", 
+                           "thoughts": [], 
+                           "data_points": []}
             return answer_dict
 
     def _get_chat_log(self, messages):
@@ -117,51 +124,58 @@ class Orchestrator:
                 return obj
             else:
                 return repr(obj)
+
         chat_log = []
         for msg in messages:
             safe_content = make_serializable(msg.content)
             chat_log.append({"speaker": msg.source, "message_type": msg.type, "content": safe_content})
         return chat_log
 
+    def _get_data_points(self, chat_log):
+        data_points = []
+        call_id_map = {}
+        allowed_extensions = {'vtt', 'xlsx', 'xls', 'pdf', 'png', 'jpeg', 'jpg', 'bmp', 'tiff', 'docx', 'pptx'}
+        extension_pattern = "|".join(allowed_extensions)
+        pattern = rf'[\w\-.]+\.(?:{extension_pattern}): .*?(?=(?:[\w\-.]+\.(?:{extension_pattern})\:)|$)'
+        if chat_log: 
+            for msg in chat_log:
+                try:
+                    if "message_type" in msg and "content" in msg and isinstance(msg["content"], list) and msg["content"]:
+                        if msg["message_type"] == "ToolCallRequestEvent":
+                            content = msg["content"][0]
+                            if "id='" in content:
+                                call_id = content.split("id='")[1].split("',")[0]
+                                call_id_map[call_id] = None
+                        elif msg["message_type"] == "ToolCallExecutionEvent":
+                            content = msg["content"][0]
+                            if "call_id='" in content:
+                                call_id = content.split("call_id='")[1].split("')")[0]
+                                if call_id in call_id_map:
+                                    if "content='" in content:
+                                        data = content.split("content='")[1].rsplit("',", 1)[0]
+                                        entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
+                                        data_points.extend(entries)
+                except Exception as e:
+                    logging.warning(f"[orchestrator] {self.short_id} Error processing message: {e}.")
+        else:
+            logging.warning(f"[orchestrator] {self.short_id} Chat log is empty or not provided.")
+        return data_points
 
-    def _print_chat_log(self, chat_log):
-        result = []
-        max_length = 400
-        ellipsis = "..."
-        
-        for item in chat_log:
-            item_str = json.dumps(item, ensure_ascii=False)
-            
-            if len(item_str) > max_length:
-                # Calculate the number of characters to keep from the start and end
-                # Subtract the length of the ellipsis from max_length
-                chars_to_keep = max_length - len(ellipsis)
-                half_length = chars_to_keep // 2
-                
-                # In case of odd number, keep the extra character at the start
-                start = item_str[:half_length + (chars_to_keep % 2)]
-                end = item_str[-half_length:]
-                truncated_str = f"{start}{ellipsis}{end}"
-            else:
-                truncated_str = item_str
-            
-            result.append(truncated_str + "\n")
-        
-        final_string = "".join(result)
-        return final_string
-
-    async def _update_conversation_history(self, conversation: dict, ask: str, answer_dict: dict, response_time: float):
+    async def _update_conversation(self, conversation: dict, ask: str, answer: str):
         logging.info(f"[orchestrator] {self.short_id} Updating conversation.")
-        history = conversation.get('history', [])
-        history.append({"role": "user", "content": ask})
-        history.append({"role": "assistant", "content": answer_dict['answer']})
-        interaction = {'user_id': self.client_principal['id'], 'user_name': self.client_principal['name'], 'response_time': round(response_time, 2)}
-        interaction.update(answer_dict)
-        conversation_data = conversation.get('conversation_data', {'start_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'interactions': []})
-        conversation_data['interactions'].append(interaction)
-        conversation['conversation_data'] = conversation_data
-        conversation['history'] = history
-        await self.cosmosdb.update_document(self.conversations_container, conversation)
+        # Retrieve the existing chat_log (if any) and extend it.
+        history = conversation.get("history", [])
+        history.extend([{"speaker": "user", "content": ask},{"speaker": "assistant", "content": answer}])
+        # Create the simplified conversation document.
+        simplified_conversation = {
+            "id": self.conversation_id,
+            "start_date": conversation.get("start_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "user_id": self.client_principal.get("id", "unknown"),
+            "user_name": self.client_principal.get("name", "anonymous"),
+            "conversation_id": self.conversation_id,
+            "history": history
+        }
+        await self.cosmosdb.update_document(self.conversations_container, simplified_conversation)
         logging.info(f"[orchestrator] {self.short_id} Finished updating conversation.")
 
     def _setup_logging(self):

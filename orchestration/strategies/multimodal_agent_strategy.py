@@ -1,27 +1,33 @@
-from typing_extensions import Annotated, Dict, Any
+import base64
+import json
+import logging
+from typing import Sequence, Annotated
 
-from tools import get_time, get_today_date, multimodal_vector_index_retrieve
+from pydantic import BaseModel
+
+from autogen_agentchat.agents import AssistantAgent, BaseChatAgent
+from autogen_agentchat.base._chat_agent import Response
+from autogen_agentchat.messages import (
+    AgentEvent,
+    ChatMessage,
+    MultiModalMessage,
+    TextMessage,
+    ToolCallSummaryMessage,
+)
+from autogen_core import CancellationToken, Image
+from autogen_core.tools import FunctionTool
+from connectors import BlobClient
+from tools import get_time, get_today_date
+from tools import multimodal_vector_index_retrieve
+from tools.ragindex.types import MultimodalVectorIndexRetrievalResult
+from autogen_core.model_context import BufferedChatCompletionContext
+
 from .base_agent_strategy import BaseAgentStrategy
 from ..constants import MULTIMODAL_RAG
-from autogen_agentchat.agents import BaseChatAgent, UserProxyAgent
-from connectors import BlobClient
 
-import requests, json
-from io import BytesIO
-
-import logging
-import base64
-
-import re
-import logging
-from typing import Sequence, Union, Annotated, Dict, Any
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.base._chat_agent import Response
-from autogen_agentchat.messages import TextMessage, MultiModalMessage, ToolCallExecutionEvent, ToolCallSummaryMessage
-from autogen_agentchat.messages import AgentEvent, ChatMessage
-from autogen_core import CancellationToken, Image  
-import requests
-from io import BytesIO
+class ChatGroupResponse(BaseModel):
+    answer: str
+    reasoning: str
 
 class MultimodalMessageCreator(BaseChatAgent):
     """
@@ -31,14 +37,14 @@ class MultimodalMessageCreator(BaseChatAgent):
     This agent simply scans the conversation for the tool's result, parses 
     text + image URLs, and returns a MultiModalMessage.
     """
-    def __init__(self, name: str, multimodal_rag_message_prompt: str):
+    def __init__(self, name: str, system_prompt: str, model_context: BufferedChatCompletionContext):
         super().__init__(
             name=name,
             description="An agent that creates `MultiModalMessage` objects from the results of `vector_index_retrieve_wrapper`, executed by an `AssistantAgent` called `retrieval_agent`."
         )
-        # You can track internal state here if needed.
         self._last_multimodal_result = None
-        self.multimodal_rag_message_prompt = multimodal_rag_message_prompt
+        self.system_prompt = system_prompt
+        self._model_context = model_context
 
     @property
     def produced_message_types(self):
@@ -69,7 +75,7 @@ class MultimodalMessageCreator(BaseChatAgent):
                         retrieval_data = parsed_content
                         break
                 except json.JSONDecodeError as e:
-                    print(f"Failed to parse message content as JSON: {e}")
+                    logging.warning(f"Failed to parse message content as JSON: {e}")
                     continue
 
         if not retrieval_data:
@@ -85,7 +91,7 @@ class MultimodalMessageCreator(BaseChatAgent):
         image_urls = retrieval_data.get("images", [])
 
         # Combine text snippets into a single string
-        combined_text = self.multimodal_rag_message_prompt + "\n\n".join(texts) if texts else "No text results"
+        combined_text = self.system_prompt + "\n\n".join(texts) if texts else "No text results"
 
         # Fetch images from URLs
         image_objects = []
@@ -139,7 +145,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = MULTIMODAL_RAG
 
-    async def create_agents(self, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Multimodal RAG creation strategy that creates the basic agents and registers functions.
         
@@ -153,48 +159,57 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         To use a different model for an specific agent, instantiate a separate AzureOpenAIChatCompletionClient and assign it instead of using self._get_model_client().
         """
 
-        # Conversation Summary
-        conversation_summary = await self._summarize_conversation(history)
+        # Model Context
+        shared_context = await self._get_model_context(history) 
 
-        # Function closure for multimodal_vector_index_retrieve
+        # Wrapper Functions for Tools
+
         async def vector_index_retrieve_wrapper(
             input: Annotated[str, "An optimized query string based on the user's ask and conversation history, when available"]
-        ) -> Annotated[Dict[str, Any], "The output includes separate lists of text and image URLs"]:
+        ) -> MultimodalVectorIndexRetrievalResult:
             return await multimodal_vector_index_retrieve(input, self._generate_security_ids(client_principal))
-        
-        # Retrieval Prompt
-        triage_prompt = await self._read_prompt("multimodal_triage_agent", {"conversation_summary": conversation_summary})
+
+        vector_index_retrieve_tool = FunctionTool(
+            vector_index_retrieve_wrapper, name="vector_index_retrieve", description="Performs a vector search using Azure AI Search fetching text and related images get relevant sources for answering the user's query."
+        )
+
+        # Agents
+
+        ## Triage Prompt
+        triage_prompt = await self._read_prompt("triage_agent")
         triage_agent = AssistantAgent(
             name="triage_agent",
             system_message=triage_prompt,
             model_client=self._get_model_client(), 
-            tools=[vector_index_retrieve_wrapper],
-            reflect_on_tool_use=False
+            tools=[vector_index_retrieve_tool],
+            reflect_on_tool_use=False,
+            model_context=shared_context
         )
 
-        # Multimodal Message Creator
-        multimodal_rag_message_prompt = await self._read_prompt("multimodal_rag_message", {"conversation_summary": conversation_summary})
-        multimodal_creator = MultimodalMessageCreator("multimodal_creator", multimodal_rag_message_prompt)
+        ## Multimodal Message Creator
+        multimodal_rag_message_prompt = await self._read_prompt("multimodal_rag_message")
+        multimodal_creator = MultimodalMessageCreator(name="multimodal_creator", system_prompt=multimodal_rag_message_prompt, model_context=shared_context)
 
-        # Assistant Agent
+        ## Assistant Agent
         main_assistant = AssistantAgent(
             name="main_assistant",
-            system_message="You are a helpful assistant who always includes the word ANSWERED at the end of your responses.",
-            model_client=self._get_model_client(),
-            reflect_on_tool_use=True    
-        )
-
-        # Create chat closure agent
-        chat_closure_prompt = await self._read_prompt("chat_closure")
-        chat_closure = AssistantAgent(
-            name="chat_closure",
-            system_message=chat_closure_prompt,
+            system_message="You are a helpful assistant who always includes the word QUESTION_ANSWERED at the end of your responses.",
             model_client=self._get_model_client(),
             reflect_on_tool_use=True
         )
 
+        ## Chat Closure Agent
+        chat_closure_prompt = await self._read_prompt("chat_closure")
+        chat_closure = AssistantAgent(
+            name="chat_closure",
+            system_message=chat_closure_prompt,
+            model_client=self._get_model_client(response_format=ChatGroupResponse)
+        )
+        
+        # Agent Configuration
+
         # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
-        # self.max_rounds = 8
+        # self.max_rounds = int(os.getenv('MAX_ROUNDS', 8))
         # self.terminate_message = "TERMINATE"
 
         def custom_selector_func(messages):

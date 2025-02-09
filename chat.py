@@ -235,7 +235,7 @@ def display_answer(answer):
 
         # Extract keys with default messages if keys are missing
         assistant_answer = answer.get("answer", "No answer provided.")
-        assistant_reasoning = answer.get("thoughts", "No reasoning provided.")
+        assistant_reasoning = answer.get("reasoning", "No reasoning provided.")
         assistant_data_points = answer.get("data_points", "No data points provided.")
 
         print(f"{BLUE}Answer: {assistant_answer}{RESET}")
@@ -258,13 +258,18 @@ def display_thoughts_and_data_points(response_data):
         response_data (dict): The API response as a JSON object.
     """
     thoughts = response_data.get('thoughts', '')
+    reasoning = response_data.get('reasoning', '')    
     data_points = response_data.get('data_points', '')
-    if thoughts or data_points:
+    if thoughts or data_points or reasoning:
         BRIGHT_CYAN = '\033[96m'
         RESET = '\033[0m'
 
         print(f"{BRIGHT_CYAN}\n--- Agent Group Chat from Last Response ---")
+        if data_points:
+            print("\nReasoning:")
+            print(reasoning)
         if thoughts:
+            print("\nThoughts:")            
             print(thoughts)
         if data_points:
             print("\nData Points:")

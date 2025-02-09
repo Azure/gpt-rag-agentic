@@ -84,7 +84,7 @@ The orchestrator supports the following strategies, each tailored to specific ne
 
 - **NL2SQL Fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
 
-- **NL2SQL Fewshot Scaled**: The `nl2sql_fewshot_scaled` strategy enhances `nl2sql_fewshot` by using AI Search Indexes to handle cases with numerous tables or columns. It identifies the most relevant schema elements based on the user's question, enabling precise SQL generation even in complex database environments.
+- **Chat with Fabric**: The `chat_with_fabric` strategy allows the orchestrator to interact with data stored in Microsoft Fabric, enabling users to query elements such as tables within both Lakehouse and semantic models. This strategy provides easy access to structured and semi-structured data in Fabric, allowing users to retrieve insights without deep knowledge of the underlying architecture.
 
 ### How to Add and Configure you Own Agent Strategies
 
@@ -239,13 +239,11 @@ This section provides configuration steps for the various NL2SQL strategies. The
 
 **Data Dictionary**
 
-The Data Dictionary is essential for SQL generation, providing a structured reference for database tables and columns. If you're using the standard `nl2sql` strategy, simply review and update the `config/nl2sql/data_dictionary.json` file as needed.
-
-If you're using the `nl2sql_fewshot_scaled` strategy, the `data_dictionary.json` file will not be used. In this case, you'll need to create the JSON files differently to be indexed. You can refer to the examples in [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) to see how to set up the table and column files for AI Search indexing.
+If you're using the `nl2sql` or `nl2sql_fewshot` strategy, the `data_dictionary.json` file will not be used. In this case, you'll need to create the JSON files differently to be indexed. You can refer to the examples in [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) to see how to set up the table and column files for AI Search indexing.
 
 **Queries**
 
-If you've chosen the `nl2sql_fewshot` or `nl2sql_fewshot_scaled` strategy, you'll need to create example queries and index them in AI Search. For guidance on creating and indexing queries, as well as for example queries, refer to [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion).
+If you've chosen the `nl2sql_fewshot` strategy, you'll need to create example queries and index them in AI Search. For guidance on creating and indexing queries, as well as for example queries, refer to [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion).
 
 ### Database Connection Setup
 
