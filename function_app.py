@@ -38,19 +38,23 @@ async def orc(req: func.HttpRequest) -> func.HttpResponse:
         conversation_id = req_body.get('conversation_id')
         question = req_body.get('question')
 
-        # Get client principal information
+        # Get client principal information (optional)
         client_principal_id = req_body.get('client_principal_id', '00000000-0000-0000-0000-000000000000')
         client_principal_name = req_body.get('client_principal_name', 'anonymous')
         client_group_names = req_body.get('client_group_names', '')
+        
         client_principal = {
             'id': client_principal_id,
             'name': client_principal_name,
             'group_names': client_group_names        
         }
 
+        # Get access token (optional)
+        access_token = req_body.get('access_token', None)
+
         # Call orchestrator
         if question:
-            orchestrator = Orchestrator(conversation_id, client_principal)
+            orchestrator = Orchestrator(conversation_id, client_principal, access_token)
             result = await orchestrator.answer(question)
             return func.HttpResponse(
                 json.dumps(result),

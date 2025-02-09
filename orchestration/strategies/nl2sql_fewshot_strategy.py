@@ -1,16 +1,28 @@
+import os
+from pydantic import BaseModel
 from autogen_agentchat.agents import AssistantAgent
+from autogen_core.tools import FunctionTool
 from .nl2sql_base_agent_strategy import NL2SQLBaseStrategy
 from ..constants import NL2SQL_FEWSHOT
-from typing import Optional, List, Dict, Union
-from tools import queries_retrieval
-from .nl2sql_base_agent_strategy import (
-    NL2SQLBaseStrategy,
-    SchemaInfo,
-    TablesList,
-    ValidateSQLResult,
-    ExecuteSQLResult
+from tools import (
+    get_time,
+    get_today_date,
+    queries_retrieval,
+    get_all_datasources_info,
+    get_all_tables_info,
+    get_schema_info,
+    validate_sql_query,
+    execute_sql_query,
 )
-from tools import get_today_date, get_time
+
+
+## Group Chat Response Format
+
+class ChatGroupResponse(BaseModel):
+    answer: str
+    reasoning: str
+
+# Agents Strategy Class
 
 class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
 
@@ -19,44 +31,64 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         super().__init__()
 
         
-    async def create_agents(self, llm_config, history, client_principal=None):
+    async def create_agents(self, history, client_principal=None, access_token=None):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """
+        
+        # Model Context
+        shared_context = await self._get_model_context(history) 
+        
+        # Wrapper Functions for Tools
 
-        self.max_rounds = 20
+        get_all_datasources_info_tool = FunctionTool(
+            get_all_datasources_info, description="Retrieve a list of all datasources."
+        )
 
-        def get_schema_info(table_name: Optional[str] = None, column_name: Optional[str] = None) -> SchemaInfo:
-            return self._get_schema_info(table_name, column_name)
+        get_all_tables_info_tool = FunctionTool(
+            get_all_tables_info, description="Retrieve a list of tables filtering by the given datasource."
+        )
 
-        def get_all_tables_info() -> TablesList:
-            return self._get_all_tables_info()
+        get_schema_info_tool = FunctionTool(
+            get_schema_info, description="Retrieve information about tables and columns from the data dictionary."
+        )        
 
-        def validate_sql_query(query: str) -> ValidateSQLResult:
-            return self._validate_sql_query(query)      
+        queries_retrieval_tool = FunctionTool(
+            queries_retrieval, description="Retrieve QueriesRetrievalResult a list of similar QueryItem containing a question, the correspondent query, selected_tables, selected_columns and reasoning."
+        )
 
-        async def execute_sql_query(query: str) -> ExecuteSQLResult:
-            return await self._execute_sql_query(query)           
+        validate_sql_query_tool = FunctionTool(
+            validate_sql_query, description="Validate the syntax of an SQL query."
+        )     
 
-        # Create Assistant Agent
-        conversation_summary = await self._summarize_conversation(history)
-        assistant_prompt = await self._read_prompt("nl2sql_assistant", {"conversation_summary": conversation_summary})
+        execute_sql_query_tool = FunctionTool(
+            execute_sql_query, description="Execute an SQL query and return the results."
+        )
+
+        # Agents
+
+        ## Assistant Agent
+        assistant_prompt = await self._read_prompt("nl2sql_assistant")
         assistant = AssistantAgent(
             name="assistant",
             system_message=assistant_prompt,
             model_client=self._get_model_client(), 
-            tools=[get_schema_info, validate_sql_query, queries_retrieval, get_all_tables_info, execute_sql_query, get_today_date, get_time],
-            reflect_on_tool_use=True
+            tools=[get_all_datasources_info_tool, get_schema_info_tool, validate_sql_query_tool, queries_retrieval_tool, get_all_tables_info_tool, execute_sql_query_tool, get_today_date, get_time],
+            reflect_on_tool_use=True,
+            model_context=shared_context
         )
 
-        # Create chat closure agent
+        ## Chat closure agent
         chat_closure_prompt = await self._read_prompt("chat_closure")
         chat_closure = AssistantAgent(
             name="chat_closure",
             system_message=chat_closure_prompt,
-            model_client=self._get_model_client(),
-            reflect_on_tool_use=True
+            model_client=self._get_model_client(response_format=ChatGroupResponse)
         )
+        
+        # Group Chat Configuration
+
+        self.max_rounds = int(os.getenv('MAX_ROUNDS', 20))
 
         def custom_selector_func(messages):
             """
@@ -74,7 +106,6 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         
         self.selector_func = custom_selector_func
 
-        # Return agent configuration
         self.agents = [assistant, chat_closure]
         
         return self._get_agent_configuration()

@@ -17,8 +17,8 @@ openai==1.59.6
 # GenAI dependencies
 
 # for 0.4 
-autogen-agentchat==0.4.3
-autogen_ext==0.4.3
+autogen-agentchat==0.4.4
+autogen_ext==0.4.4
 
 aiohttp==3.10.11
 # asyncio==3.4.3
@@ -27,3 +27,6 @@ aiohttp==3.10.11
 sqlparse==0.5.1
 pyodbc==5.1.0
 teradatasql==20.0.0.17
+
+# Utility dependencies
+tenacity==9.0.0
