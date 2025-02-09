@@ -75,7 +75,7 @@ class MultimodalMessageCreator(BaseChatAgent):
                         retrieval_data = parsed_content
                         break
                 except json.JSONDecodeError as e:
-                    print(f"Failed to parse message content as JSON: {e}")
+                    logging.warning(f"Failed to parse message content as JSON: {e}")
                     continue
 
         if not retrieval_data:

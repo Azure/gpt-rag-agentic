@@ -115,10 +115,10 @@ class QueriesRetrievalResult(BaseModel):
     Represents the overall result for queries retrieval.
 
     Attributes:
-        results (List[QueryItem]): A list of query retrieval results.
+        queries (List[QueryItem]): A list of query retrieval results.
         error (Optional[str]): An error message, if any. Defaults to None.
     """
-    results: List[QueryItem] = Field(..., description="A list of query retrieval results")
+    queries: List[QueryItem] = Field(..., description="A list of query retrieval results")
     error: Optional[str] = Field(None, description="Error message if query fails")
 
 

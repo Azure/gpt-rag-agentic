@@ -29,9 +29,7 @@ async def execute_dax_query(datasource: Annotated[str, "Target datasource"], que
         datasource_config = await cosmosdb.get_document('datasources', datasource)
         if not datasource_config or datasource_config.get("type") != "semantic_model":
             return ExecuteQueryResult(error=f"{datasource} datasource configuration not found or invalid for Semantic Model.")
-        
-        print(f"Datasource Config: {datasource_config}")
-
+    
         semantic_model_config = SemanticModelConfig(
             id=datasource_config.get("id"),
             description=datasource_config.get("description"),
@@ -43,7 +41,7 @@ async def execute_dax_query(datasource: Annotated[str, "Target datasource"], que
             client_id=datasource_config.get("client_id")
         ) 
         semantic_client = SemanticModelClient(semantic_model_config)
-        results = await semantic_client.execute_restapi_dax_query(dax_query=query, access_token=access_token)
+        results = await semantic_client.execute_restapi_dax_query(dax_query=query, user_token=access_token)
         return ExecuteQueryResult(results=results)
     except Exception as e:
         return ExecuteQueryResult(error=str(e))

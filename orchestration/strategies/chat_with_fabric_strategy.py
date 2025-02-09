@@ -70,7 +70,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         )        
 
         queries_retrieval_tool = FunctionTool(
-            queries_retrieval, description="Retrieve a list of similar questions and the correspondent query, selected_tables, selected_columns and reasoning."
+            queries_retrieval, description="Retrieve QueriesRetrievalResult a list of similar QueryItem containing a question, the correspondent query, selected_tables, selected_columns and reasoning."
         )
 
         async def execute_dax_query_wrapper(
@@ -88,7 +88,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         )     
 
         execute_sql_query_tool = FunctionTool(
-            execute_sql_query, description="Execute an SQL query against the datasource provided by the Triage Agent and return the results."
+            execute_sql_query, description="Execute a SQL query against the datasource provided by the Triage Agent and return the results."
         )     
 
         # Agents      
@@ -110,7 +110,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             name="dax_query_agent",
             system_message=dax_query_prompt,
             model_client=self._get_model_client(), 
-            tools=[queries_retrieval_tool, get_all_tables_info_tool, get_schema_info_tool, execute_dax_query_tool, get_today_date, get_time],
+            tools=[queries_retrieval_tool, get_schema_info_tool, execute_dax_query_tool, get_today_date, get_time],
             reflect_on_tool_use=True,
             model_context=shared_context
         )
@@ -121,7 +121,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             name="sql_query_agent",
             system_message=sql_query_prompt,
             model_client=self._get_model_client(), 
-            tools=[queries_retrieval_tool, get_all_tables_info_tool, get_schema_info_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
+            tools=[queries_retrieval_tool, get_schema_info_tool, validate_sql_query_tool, execute_sql_query_tool, get_today_date, get_time],
             reflect_on_tool_use=True,
             model_context=shared_context
         )        

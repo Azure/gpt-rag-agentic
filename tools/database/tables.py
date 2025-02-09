@@ -68,7 +68,7 @@ async def _perform_search(body: Dict[str, Any], search_index: str) -> Dict[str, 
                 if response.status >= 400:
                     text = await response.text()
                     error_message = f"Status code: {response.status}. Error: {text}"
-                    logging.error(f"[ai_search] {error_message}")
+                    logging.error(f"[tables] {error_message}")
                     raise Exception(error_message)
                 result = await response.json()
                 return result
@@ -101,7 +101,7 @@ async def get_all_tables_info(
         "top": 1000  # Adjust based on your expected document count.
     }
 
-    logging.info(f"[ai_search] Querying Azure AI Search for tables in datasource '{datasource}'")
+    logging.info(f"[tables] Querying Azure AI Search for tables in datasource '{datasource}'")
     tables_info: List[TableItem] = []
     error_message: Optional[str] = None
 
@@ -109,7 +109,7 @@ async def get_all_tables_info(
         start_time = time.time()
         result = await _perform_search(body, search_index)
         elapsed = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished querying tables in {elapsed} seconds")
+        logging.info(f"[tables] Finished querying tables in {elapsed} seconds")
 
         for doc in result.get("value", []):
             table_item = TableItem(
@@ -120,7 +120,7 @@ async def get_all_tables_info(
             tables_info.append(table_item)
     except Exception as e:
         error_message = str(e)
-        logging.error(f"[ai_search] Error querying tables: {error_message}")
+        logging.error(f"[tables] Error querying tables: {error_message}")
 
     if not tables_info:
         return TablesList(
@@ -157,14 +157,14 @@ async def get_schema_info(
         "top": 1
     }
 
-    logging.info(f"[ai_search] Querying Azure AI Search for schema info for table '{table_name}' in datasource '{datasource}'")
+    logging.info(f"[tables] Querying Azure AI Search for schema info for table '{table_name}' in datasource '{datasource}'")
     error_message: Optional[str] = None
 
     try:
         start_time = time.time()
         result = await _perform_search(body, search_index)
         elapsed = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished querying schema info in {elapsed} seconds")
+        logging.info(f"[tables] Finished querying schema info in {elapsed} seconds")
 
         docs = result.get("value", [])
         if not docs:
@@ -194,7 +194,7 @@ async def get_schema_info(
         )
     except Exception as e:
         error_message = str(e)
-        logging.error(f"[ai_search] Error querying schema info: {error_message}")
+        logging.error(f"[tables] Error querying schema info: {error_message}")
         return SchemaInfo(
             datasource=datasource,
             table=table_name,
@@ -232,9 +232,9 @@ async def tables_retrieval(
     try:
         # Generate embeddings for the search query using the Azure OpenAI Client.
         aoai = AzureOpenAIClient()
-        logging.info(f"[ai_search] Generating question embeddings. Search query: {search_query}")
+        logging.info(f"[tables] Generating question embeddings. Search query: {search_query}")
         embeddings_query = await asyncio.to_thread(aoai.get_embeddings, search_query)
-        logging.info("[ai_search] Finished generating question embeddings.")
+        logging.info("[tables] Finished generating question embeddings.")
 
         # Prepare the request body.
         body: Dict[str, Any] = {
@@ -269,15 +269,15 @@ async def tables_retrieval(
             body["queryType"] = "semantic"
             body["semanticConfiguration"] = semantic_search_config
 
-        logging.info(f"[ai_search] Querying Azure AI Search for tables. Search query: {search_query}")
+        logging.info(f"[tables] Querying Azure AI Search for tables. Search query: {search_query}")
         start_time = time.time()
         result = await _perform_search(body, search_index)
         elapsed = round(time.time() - start_time, 2)
-        logging.info(f"[ai_search] Finished querying Azure AI Search in {elapsed} seconds")
+        logging.info(f"[tables] Finished querying Azure AI Search in {elapsed} seconds")
 
         # Process the returned documents.
         if result.get("value"):
-            logging.info(f"[ai_search] {len(result['value'])} documents retrieved")
+            logging.info(f"[tables] {len(result['value'])} documents retrieved")
             for doc in result["value"]:
                 table_name = doc.get("table_name", "")
                 description = doc.get("description", "")
@@ -287,9 +287,9 @@ async def tables_retrieval(
                     datasource=datasource
                 ))
         else:
-            logging.info("[ai_search] No documents retrieved")
+            logging.info("[tables] No documents retrieved")
     except Exception as e:
         error_message = str(e)
-        logging.error(f"[ai_search] Error when retrieving tables: {error_message}")
+        logging.error(f"[tables] Error when retrieving tables: {error_message}")
 
     return TablesRetrievalResult(tables=search_results, error=error_message)

@@ -86,13 +86,13 @@ class SemanticModelClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type(aiohttp.ClientError)
     )
-    async def execute_restapi_dax_query(self, dax_query: str, access_token: str = None, impersonated_user: str = None) -> list:
+    async def execute_restapi_dax_query(self, dax_query: str, user_token: str = None, impersonated_user: str = None) -> list:
         """
         Execute a DAX query against the semantic model endpoint.
         Returns a list of dictionaries representing the query rows.
         """
-        if access_token is None:
-            access_token = await self._get_restapi_access_token()
+
+        access_token = user_token
 
         headers = {
             "Content-Type": "application/json",
