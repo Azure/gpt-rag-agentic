@@ -142,7 +142,7 @@ class SemanticModelClient:
                 elif 400 <= response.status < 500:
                     error_message = await response.text()
                     logging.error(f"[fabric] Client error executing DAX query. Status: {response.status}, Message: {error_message}")
-                    return []
+                    raise aiohttp.ClientError(f"Client error: {response.status} - {error_message}")
                 else:
                     error_message = await response.text()
                     logging.error(f"[fabric] Server error executing DAX query. Status: {response.status}, Message: {error_message}")
