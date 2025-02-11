@@ -175,7 +175,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
 
         # Agents
 
-        ## Triage Prompt
+        ## Triage Agent
         triage_prompt = await self._read_prompt("triage_agent")
         triage_agent = AssistantAgent(
             name="triage_agent",
