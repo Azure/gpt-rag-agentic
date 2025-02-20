@@ -5,8 +5,6 @@ __blobstorage__/
 *$py.class
 local/
 local.settings.json
-__azurite_db_blob__.json
-__azurite_db_blob_extent__.json
 __*/*
 *.custom.txt
 *.custom.json
@@ -18,6 +16,7 @@ output.log
 responses_*.jsonl
 responses_*.xslx
 config.txt
+__azurite*
 
 # Evaluations
 qa_flow_quality_eval.jsonl
