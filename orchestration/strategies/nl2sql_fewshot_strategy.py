@@ -54,7 +54,7 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         )        
 
         queries_retrieval_tool = FunctionTool(
-            queries_retrieval, description="Retrieve QueriesRetrievalResult a list of similar QueryItem containing a question, the correspondent query, selected_tables, selected_columns and reasoning."
+            queries_retrieval, description="Retrieve QueriesRetrievalResult a list of similar QueryItem containing a question, the correspondent query and reasoning."
         )
 
         validate_sql_query_tool = FunctionTool(

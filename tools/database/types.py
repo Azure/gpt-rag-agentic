@@ -1,7 +1,8 @@
 # Database Tools Models
 
-from pydantic import BaseModel
-from typing import Dict, List, Optional, Union
+from pydantic import BaseModel, Field
+from typing import Dict, List, Optional, Union, Literal
+
 
 class DataSourceItem(BaseModel):
     """
@@ -100,14 +101,10 @@ class QueryItem(BaseModel):
     Attributes:
         question: The question from the search result.
         query: The optimized query string.
-        selected_tables: A list of selected tables.
-        selected_columns: A list of selected columns.
         reasoning: Explanation or reasoning behind the query construction.
     """
     question: str = Field(..., description="The question from the search result")
     query: str = Field(..., description="The optimized query string")
-    selected_tables: List[str] = Field(..., description="List of selected tables")
-    selected_columns: List[str] = Field(..., description="List of selected columns")
     reasoning: str = Field(..., description="The reasoning behind the query construction")
 
 class QueriesRetrievalResult(BaseModel):
@@ -141,3 +138,36 @@ class TablesRetrievalResult(BaseModel):
     """
     tables: List[TableRetrievalItem] = Field(..., description="List of tables with details")
     error: Optional[str] = Field(None, description="Error message if query fails") 
+
+class MeasureItem(BaseModel):
+    """
+    Represents information about a specific measure.
+
+    Attributes:
+        name: The name of the measure.
+        description: A brief description of the measure.
+        datasource: The datasource where the measure resides.
+        type: The type of the measure ("external" or "local").
+        source_table: The source table associated with the measure.
+        data_type: The data type of the measure.
+        source_model: The source model for the measure.
+    """
+    name: str = Field(..., description="The name of the measure")
+    description: str = Field(..., description="A brief description of the measure")
+    datasource: str = Field(..., description="The datasource for the measure")
+    type: Literal["external", "local"] = Field(..., description="The type of the measure (external or local)")
+    source_table: Optional[str] = Field(None, description="The source table for the measure")
+    data_type: Optional[str] = Field(None, description="The data type of the measure")
+    source_model: Optional[str] = Field(None, description="The source model for the external measure")
+
+
+class MeasuresList(BaseModel):
+    """
+    Represents a list of measures along with optional error information.
+
+    Attributes:
+        measures: A list of MeasureItem instances.
+        error: An optional error message if issues occur.
+    """
+    measures: List[MeasureItem] = Field(..., description="List of measures with details")
+    error: Optional[str] = Field(None, description="Error message if query fails")

@@ -25,7 +25,7 @@ async def queries_retrieval(
         
     Returns:
         QueriesRetrievalResult: A model containing search results where each result includes
-                                question, query, selected_tables, selected_columns, and reasoning.
+                                question, query and reasoning.
                                 If an error occurs, the 'error' field is populated.
     """
     aoai = AzureOpenAIClient()
@@ -69,7 +69,7 @@ async def queries_retrieval(
 
         # Prepare the request body for the search query.
         body = {
-            "select": "question, query, selected_tables, selected_columns, reasoning",
+            "select": "question, query, reasoning",
             "top": search_top_k
         }
         if datasource:
@@ -127,14 +127,10 @@ async def queries_retrieval(
                         for doc in json_response['value']:
                             question = doc.get('question', '')
                             query = doc.get('query', '')
-                            selected_tables = doc.get('selected_tables', [])
-                            selected_columns = doc.get('selected_columns', [])
                             reasoning = doc.get('reasoning', '')
                             search_results.append({
                                 "question": question,
                                 "query": query,
-                                "selected_tables": selected_tables,
-                                "selected_columns": selected_columns,
                                 "reasoning": reasoning
                             })
                     else:

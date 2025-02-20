@@ -16,6 +16,7 @@ from tools import (
     queries_retrieval,
     get_all_datasources_info,
     tables_retrieval,
+    measures_retrieval,
     get_all_tables_info,
     get_schema_info,
     execute_dax_query,
@@ -69,8 +70,12 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             get_schema_info, description="Retrieve information about tables and columns from the data dictionary."
         )        
 
+        measures_retrieval_tool = FunctionTool(
+            measures_retrieval, description="Retrieve a list of measures filtering by the given datasource."
+        )
+
         queries_retrieval_tool = FunctionTool(
-            queries_retrieval, description="Retrieve QueriesRetrievalResult a list of similar QueryItem containing a question, the correspondent query, selected_tables, selected_columns and reasoning."
+            queries_retrieval, description="Retrieve QueriesRetrievalResult a list of similar QueryItem containing a question, the correspondent query and reasoning."
         )
 
         async def execute_dax_query_wrapper(
@@ -110,7 +115,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
             name="dax_query_agent",
             system_message=dax_query_prompt,
             model_client=self._get_model_client(), 
-            tools=[queries_retrieval_tool, get_schema_info_tool, execute_dax_query_tool, get_today_date, get_time],
+            tools=[queries_retrieval_tool, measures_retrieval_tool, get_schema_info_tool, execute_dax_query_tool, get_today_date, get_time],
             reflect_on_tool_use=True,
             model_context=shared_context
         )
@@ -184,4 +189,3 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         # self.agents = [triage_agent, query_agents, chat_closure]
 
         return self._get_agent_configuration()
-
