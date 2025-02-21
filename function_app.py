@@ -1,76 +1,12 @@
-import json
-import logging
-import os
+# function_app.py
 import azure.functions as func
-from orchestration import Orchestrator
+from azure.functions import AsgiMiddleware
+from fast_api_app import app as fastapi_app
 
-
-###############################################################################
-# Logging Configuration
-###############################################################################
-
-default_log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-autogen_log_level = os.getenv('AUTOGEN_LOG_LEVEL', 'WARNING').upper()
-
-logging.basicConfig(level=getattr(logging, default_log_level))
-logging.getLogger('autogen_core').setLevel(getattr(logging, autogen_log_level))
-logging.getLogger('autogen_agentchat').setLevel(getattr(logging, autogen_log_level))
-
-###############################################################################
-# Pipeline Functions
-###############################################################################
-
+# Create the FunctionApp object.
 app = func.FunctionApp()
 
-###################################################################################
-# Orchestator function (HTTP Triggered by AI Search)
-###################################################################################
-
-        
-@app.route(route="orc", auth_level=func.AuthLevel.FUNCTION)
-async def orc(req: func.HttpRequest) -> func.HttpResponse:
-    try:
-        logging.info("Logging initialized with LOG_LEVEL: %s and AUTOGEN_LOG_LEVEL: %s", default_log_level, autogen_log_level)
-
-        req_body = req.get_json()
-
-        # Get input parameters
-        conversation_id = req_body.get('conversation_id')
-        question = req_body.get('question')
-
-        # Get client principal information (optional)
-        client_principal_id = req_body.get('client_principal_id', '00000000-0000-0000-0000-000000000000')
-        client_principal_name = req_body.get('client_principal_name', 'anonymous')
-        client_group_names = req_body.get('client_group_names', '')
-        
-        client_principal = {
-            'id': client_principal_id,
-            'name': client_principal_name,
-            'group_names': client_group_names        
-        }
-
-        # Get access token (optional)
-        access_token = req_body.get('access_token', None)
-
-        # Call orchestrator
-        if question:
-            orchestrator = Orchestrator(conversation_id, client_principal, access_token)
-            result = await orchestrator.answer(question)
-            return func.HttpResponse(
-                json.dumps(result),
-                mimetype="application/json",
-                status_code=200
-            )
-        else:
-            return func.HttpResponse(
-                json.dumps({"error": "no question found in json input"}),
-                mimetype="application/json",
-                status_code=400
-            )
-    except Exception as e:
-        logging.error(f"Error processing request: {e}")
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            mimetype="application/json",
-            status_code=500
-        )
+# Route all incoming requests (adjust route as needed)
+@app.route(route="{*path}", auth_level=func.AuthLevel.FUNCTION)
+def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
+    return AsgiMiddleware(fastapi_app).handle(req)

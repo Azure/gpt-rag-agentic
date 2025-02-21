@@ -5,6 +5,7 @@ import re
 import time
 import uuid
 from datetime import datetime
+import asyncio
 
 from autogen_agentchat.teams import SelectorGroupChat
 from connectors import CosmosDBClient
@@ -44,6 +45,19 @@ class Orchestrator:
         response_time = time.time() - start_time
         logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")
         return answer_dict
+
+    async def answer_stream(self, ask: str):
+        """
+        Streaming version of answer().
+        This implementation calls the existing answer() method and then simulates streaming by splitting
+        the final answer into chunks with small delays.
+        """
+        result = await self.answer(ask)
+        answer_text = result.get("answer", "")
+        chunk_size = 100  # Adjust chunk size as desired
+        for i in range(0, len(answer_text), chunk_size):
+            yield answer_text[i:i+chunk_size]
+            await asyncio.sleep(0.05)
 
     async def _get_or_create_conversation(self) -> dict:
         conversation = await self.cosmosdb.get_document(self.conversations_container, self.conversation_id)
