@@ -1,8 +1,12 @@
+
 # Azure Functions dependencies
 azure-functions
 azurefunctions-extensions-bindings-blob
-fastapi>=0.100.0
-uvicorn>=0.22.0
+ 
+# azurefunctions-extensions-http-fastapi
+# Obtaining azurefunctions-extensions-http-fastapi 1.0.0b3 from github to get pydantic 2.10.1 support
+git+https://github.com/Azure/azure-functions-python-extensions.git@1.0.0b3#egg=azurefunctions-extensions-http-fastapi&subdirectory=azurefunctions-extensions-http-fastapi
+
 
 # Azure SDK dependencies
 azure-keyvault-secrets==4.8.0
