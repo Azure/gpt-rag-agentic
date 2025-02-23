@@ -289,10 +289,22 @@ class Orchestrator:
         final_text = ""
         should_break = False
 
+        def sanitize_json_string(content: str) -> str:
+            content = content.strip()
+            content = content.replace("\\\'", "'")
+            content = content.replace("\\\\", "\\")
+            if content.startswith("'") and content.endswith("'"):
+                content = content.replace("'", '"')
+            content = re.sub(r'\\[^\\"/bfnrtu]', '', content)
+            return content
+
         if text_only:
             if is_final:
                 try:
                     data = json.loads(content)
+                except json.JSONDecodeError:
+                    sanitized_content = sanitize_json_string(content)
+                    data = json.loads(sanitized_content)
                 except Exception:
                     data = {}
                 answer_text = data.get("answer", "")
@@ -319,13 +331,11 @@ class Orchestrator:
         return should_break, final_text, outputs
 
     def _clean_answer_text(self, text: str) -> str:
-        """
-        Clean answer text by removing markdown links, headers, formatting, and extra whitespace.
-        """
+        text = re.sub(r'\[.*?\]', '', text)             # Remove all text between square brackets.
         text = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', text)  # Remove markdown links.
-        text = re.sub(r'#+', '', text)                         # Remove markdown headers.
-        text = re.sub(r'[_*`]', '', text)                       # Remove formatting characters.
-        text = re.sub(r'\s+', ' ', text).strip()               # Collapse whitespace.
+        text = re.sub(r'#+', '', text)                  # Remove markdown headers.
+        text = re.sub(r'[_*`]', '', text)               # Remove formatting characters.
+        text = re.sub(r'\s+', ' ', text).strip()        # Collapse whitespace.
         return text
 
     ###########################################################################

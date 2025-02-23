@@ -6,7 +6,7 @@ def main():
 
     # Ask the user if they want text-only output
     text_only_input = input("Do you want text only output? (y/n): ").strip().lower()
-    text_only = text_only_input == "y"
+    text_only = text_only_input != "n"
     
     payload = {
         "conversation_id": "",
