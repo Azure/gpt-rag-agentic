@@ -1,9 +1,34 @@
 import requests
-import json
+import logging
+import os
+import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+def get_rest_api_config():
+    """
+    Load environment variables from a `.env` file.
+
+    Exits the program if required environment variables are missing.
+
+    Returns:
+        tuple: Contains uri (str), x_functions_key (str)
+    """
+    load_dotenv()
+
+    uri = os.getenv("STREAMING_ENDPOINT", "http://localhost:7071/api/orcstream")
+    x_functions_key = os.getenv('FUNCTION_KEY')
+
+    if not x_functions_key:
+        print("FUNCTION_KEY not found in environment variables.")
+        sys.exit(1)
+
+    return uri, x_functions_key
 
 def main():
-    url = "http://localhost:7071/api/orcstream"  # Adjust URL as needed
-
+    url, x_functions_key = get_rest_api_config()
     # Ask the user if they want text-only output
     text_only_input = input("Do you want text only output? (y/n): ").strip().lower()
     text_only = text_only_input != "n"
@@ -15,7 +40,10 @@ def main():
         "client_principal_name": "anonymous",
         "text_only": text_only
     }
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        'x-functions-key': x_functions_key,
+        'Content-Type': 'application/json'
+    }
 
     with requests.post(url, json=payload, headers=headers, stream=True) as response:
         response.raise_for_status()

@@ -39,3 +39,4 @@ tenacity==9.0.0
 
 # For evaluation
 requests
+python-dotenv
