@@ -1,76 +1,61 @@
-import json
-import logging
-import os
+# function_app.py
 import azure.functions as func
+from azurefunctions.extensions.http.fastapi import Request, StreamingResponse, JSONResponse
+import json
 from orchestration import Orchestrator
+import logging
 
+# Create the Function App with the desired auth level.
+app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
-###############################################################################
-# Logging Configuration
-###############################################################################
+@app.route(route="orc", methods=[func.HttpMethod.POST])
+async def orc_endpoint(req: Request) -> JSONResponse:
+    data = await req.json()
+    conversation_id = data.get("conversation_id")
+    question = data.get("question")
 
-default_log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-autogen_log_level = os.getenv('AUTOGEN_LOG_LEVEL', 'WARNING').upper()
+    # Gather client principal info (optional)
+    client_principal = {
+        "id": data.get("client_principal_id", "00000000-0000-0000-0000-000000000000"),
+        "name": data.get("client_principal_name", "anonymous"),
+        "group_names": data.get("client_group_names", "")
+    }
+    access_token = data.get("access_token", None)
+    
+    if question:
+        orchestrator = Orchestrator(conversation_id, client_principal, access_token)
+        result = await orchestrator.answer(question)
+        return JSONResponse(content=result)
+    else:
+        return JSONResponse(content={"error": "no question found in json input"}, status_code=400)
 
-logging.basicConfig(level=getattr(logging, default_log_level))
-logging.getLogger('autogen_core').setLevel(getattr(logging, autogen_log_level))
-logging.getLogger('autogen_agentchat').setLevel(getattr(logging, autogen_log_level))
+@app.route(route="orcstream", methods=[func.HttpMethod.POST])
+async def orcstream_endpoint(req: Request) -> StreamingResponse:
+    data = await req.json()
+    conversation_id = data.get("conversation_id")
+    question = data.get("question")
+    text_only = data.get("text_only", False)
 
-###############################################################################
-# Pipeline Functions
-###############################################################################
-
-app = func.FunctionApp()
-
-###################################################################################
-# Orchestator function (HTTP Triggered by AI Search)
-###################################################################################
-
+    # Gather client principal info (optional)
+    client_principal = {
+        "id": data.get("client_principal_id", "00000000-0000-0000-0000-000000000000"),
+        "name": data.get("client_principal_name", "anonymous"),
+        "group_names": data.get("client_group_names", "")
+    }
+    access_token = data.get("access_token", None)
+    
+    if question:
+        orchestrator = Orchestrator(conversation_id, client_principal, access_token)
         
-@app.route(route="orc", auth_level=func.AuthLevel.FUNCTION)
-async def orc(req: func.HttpRequest) -> func.HttpResponse:
-    try:
-        logging.info("Logging initialized with LOG_LEVEL: %s and AUTOGEN_LOG_LEVEL: %s", default_log_level, autogen_log_level)
-
-        req_body = req.get_json()
-
-        # Get input parameters
-        conversation_id = req_body.get('conversation_id')
-        question = req_body.get('question')
-
-        # Get client principal information (optional)
-        client_principal_id = req_body.get('client_principal_id', '00000000-0000-0000-0000-000000000000')
-        client_principal_name = req_body.get('client_principal_name', 'anonymous')
-        client_group_names = req_body.get('client_group_names', '')
+        async def stream_generator():
+            logging.info("[orcstream_endpoint] Entering stream_generator")
+            async for chunk in orchestrator.answer_stream(question, text_only=text_only):
+                if text_only:
+                    yield chunk  # Assuming chunk is already a string.
+                else:
+                    yield json.dumps(chunk)
         
-        client_principal = {
-            'id': client_principal_id,
-            'name': client_principal_name,
-            'group_names': client_group_names        
-        }
-
-        # Get access token (optional)
-        access_token = req_body.get('access_token', None)
-
-        # Call orchestrator
-        if question:
-            orchestrator = Orchestrator(conversation_id, client_principal, access_token)
-            result = await orchestrator.answer(question)
-            return func.HttpResponse(
-                json.dumps(result),
-                mimetype="application/json",
-                status_code=200
-            )
-        else:
-            return func.HttpResponse(
-                json.dumps({"error": "no question found in json input"}),
-                mimetype="application/json",
-                status_code=400
-            )
-    except Exception as e:
-        logging.error(f"Error processing request: {e}")
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            mimetype="application/json",
-            status_code=500
-        )
+        media_type = "text/event-stream" if text_only else "application/stream+json"
+        return StreamingResponse(stream_generator(), media_type=media_type)
+    else:
+        return JSONResponse(content={"error": "no question found in json input"}, status_code=400)
