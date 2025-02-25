@@ -72,6 +72,7 @@ class Orchestrator:
         self.conversation_id = self._use_or_create_conversation_id(conversation_id)
         self.short_id = self.conversation_id[:8]
         self.cosmosdb = CosmosDBClient()
+        self.optimize_for_audio = False
         self.conversations_container = os.environ.get('CONVERSATION_CONTAINER', 'conversations')
         self.storage_account = os.environ.get('AZURE_STORAGE_ACCOUNT', 'your_storage_account')
         self.documents_container = os.environ.get('AZURE_STORAGE_CONTAINER', 'documents')
@@ -117,7 +118,12 @@ class Orchestrator:
             reasoning = ""
             last_message = result.messages[-1].content if result.messages else '{"answer":"No answer provided."}'
             try:
-                message_data = json.loads(last_message)
+                if isinstance(last_message, list):
+                    message_data = last_message
+                elif isinstance(last_message, (str, bytes, bytearray)):
+                    message_data = json.loads(last_message)
+                else:
+                    raise TypeError("Expected last_message to be str, bytes, or list, got: " + str(type(last_message)))
                 answer = message_data.get("answer", "Oops! The agent team did not generate a response for the user.")
                 reasoning = message_data.get("reasoning", "")
             except json.JSONDecodeError:
@@ -166,7 +172,7 @@ class Orchestrator:
         Finally, the conversation is updated with only the final answer text.
         """
         MAX_CONTENT_SIZE = 500
-
+        self.optimize_for_audio = text_only
         conversation = await self._get_or_create_conversation()
         history = conversation.get("history", [])
         agent_config = await self._create_agents_with_strategy(history)
@@ -389,7 +395,7 @@ class Orchestrator:
 
     async def _create_agents_with_strategy(self, history: list[dict]) -> list:
         logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
-        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token)
+        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token, self.optimize_for_audio)
 
     def _get_chat_log(self, messages):
         def make_serializable(obj):

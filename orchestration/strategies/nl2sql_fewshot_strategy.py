@@ -31,7 +31,7 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         super().__init__()
 
         
-    async def create_agents(self, history, client_principal=None, access_token=None):
+    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """
