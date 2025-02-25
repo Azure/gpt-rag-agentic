@@ -145,7 +145,7 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = MULTIMODAL_RAG
 
-    async def create_agents(self, history, client_principal=None, access_token=None):
+    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
         """
         Multimodal RAG creation strategy that creates the basic agents and registers functions.
         

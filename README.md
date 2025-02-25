@@ -7,19 +7,15 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
 1. [**Concepts**](#concepts)
    - [1.1 How the Orchestrator Works](#how-the-orchestrator-works)
    - [1.2 Agent Strategies](#selecting-an-agent-strategy)
-   - [1.3 Create your Own Agent Strategy](#how-to-add-and-configure-you-own-agent-strategies)
+   - [1.3 NL2SQL and Chat with Fabric](docs/NL2SQL.md)   
+   - [1.4 Create your Own Agent Strategy](#how-to-add-and-configure-you-own-agent-strategies)
 2. [**Running the Orchestrator**](#running-the-orchestrator)
    - [2.1 Cloud Deployment](#cloud-deployment)
    - [2.2 Running the Chat Client Locally](#running-the-chat-client-locally)
    - [2.3 Running the Function Locally](docs/LOCAL_DEPLOYMENT.md)
-3. [**NL2SQL Strategies Configuration**](#nl2sql-strategies-configuration)
-   - [3.1 Configuring NL2SQL Strategies](#configuring-nl2sql-strategies)
-   - [3.2 Data Dictionary and Query samples](#nl2sql-data)
-   - [3.3 Database Connection Setup](#database-connection-setup)
-   - [3.3.1 SQL Database Connection](#sql-database-connection)
-4. [**Evaluation**](#evaluation)
-5. [**Contributing**](#contributing)
-6. [**Trademarks**](#trademarks)
+3. [**Evaluation**](#evaluation)
+4. [**Contributing**](#contributing)
+5. [**Trademarks**](#trademarks)
 
 ---
 
@@ -76,6 +72,7 @@ The orchestrator selects the agent strategy based on the `AUTOGEN_ORCHESTRATION_
 The orchestrator supports the following strategies, each tailored to specific needs:
 
 - **Classical RAG**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
+
 - **Classical RAG**: The `classic_rag` strategy is the default mode of operation for the orchestrator. It is optimized for retrieving information from a predefined knowledge base indexed as an AI Search Index. This strategy leverages retrieval-augmented generation (RAG) techniques to fetch and synthesize information from existing documents or databases, ensuring accurate and relevant responses based on the available data.
 
 - **Multimodal RAG**: In the `multimodal_rag` strategy, user queries are searched in an index containing text content and image descriptions. The system combines text and images to generate a comprehensive response.
@@ -85,6 +82,9 @@ The orchestrator supports the following strategies, each tailored to specific ne
 - **NL2SQL Fewshot**: The `nl2sql_fewshot` strategy enhances the standard `nl2sql` approach by utilizing AI-driven search to identify similar past queries. This few-shot learning technique improves the accuracy and relevance of the generated SQL statements by learning from a limited set of examples, thereby refining the query translation process.
 
 - **Chat with Fabric**: The `chat_with_fabric` strategy allows the orchestrator to interact with data stored in Microsoft Fabric, enabling users to query elements such as tables within both Lakehouse and semantic models. This strategy provides easy access to structured and semi-structured data in Fabric, allowing users to retrieve insights without deep knowledge of the underlying architecture.
+
+> [!TIP]
+> [Click here](docs/NL2SQL.md) for more information about **NL2SQL** and **Chat with Fabric** Strategies.
 
 ### How to Add and Configure you Own Agent Strategies
 
@@ -226,55 +226,6 @@ az role assignment create --role "Search Index Data Reader" --assignee $principa
 ### Running the Function Locally
 
 To run the Azure Function locally, see [Testing the Solution Locally in VS Code](docs/LOCAL_DEPLOYMENT.md).
-
----
-
-## NL2SQL Strategies Configuration
-
-### Configuring NL2SQL Strategies
-
-This section provides configuration steps for the various NL2SQL strategies. These strategies convert natural language queries into SQL statements compatible with your databases.
-
-### NL2SQL Data
-
-**Data Dictionary**
-
-If you're using the `nl2sql` or `nl2sql_fewshot` strategy, the `data_dictionary.json` file will not be used. In this case, you'll need to create the JSON files differently to be indexed. You can refer to the examples in [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion) to see how to set up the table and column files for AI Search indexing.
-
-**Queries**
-
-If you've chosen the `nl2sql_fewshot` strategy, you'll need to create example queries and index them in AI Search. For guidance on creating and indexing queries, as well as for example queries, refer to [gpt-rag-ingestion](https://github.com/azure/gpt-rag-ingestion).
-
-### Database Connection Setup
-
-Set up database connections by configuring the required environment variables for each target database.
-
-### SQL Database Connection
-
-To set up a connection to your SQL Database, follow these steps based on your authentication method.
-
-1. **Configure environment variables:**
-
-    ```bash
-    SQL_DATABASE_SERVER=my-database-server
-    SQL_DATABASE_NAME=my-database-name
-    ```
-
-    - If using **SQL Authentication**, also set the following environment variable and store the user's password securely in Key Vault as a secret named `sqlDatabasePassword`:
-      
-      ```bash
-      SQL_DATABASE_UID=my-username
-      ```
-
-    - If using **Azure Active Directory (AAD) Authentication**, **do not set** the `SQL_DATABASE_UID` variable. The application will use the identity associated with your environment.
-
-2. **Permissions:**
-    Ensure your identity has the `db_datareader` role on the database. For more details on setting up your permissions, refer to the [SQL Database Setup Guide](https://learn.microsoft.com/azure/azure-sql/database/azure-sql-python-quickstart).
-
-3. **Connection details in code:**
-
-   - If `SQL_DATABASE_UID` is set, the code will use SQL Authentication, retrieving the password from the Key Vault.
-   - If `SQL_DATABASE_UID` is not set, the code will default to Azure AD token-based authentication. 
 
 ## Evaluation
 

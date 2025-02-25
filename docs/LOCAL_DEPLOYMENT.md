@@ -19,9 +19,9 @@ Once the cloud resources (such as CosmosDB and KeyVault) have been provisioned a
    
 5. When opening it for the first time, create a virtual environment and point it to [Python version 3.10](https://www.python.org/downloads/release/python-31011/) or higher. <BR>Follow the examples illustrated in the images below.  
 
-![Creating Python Environment 01](../media/06.03.2024_12.15.23_REC.png)
+![Creating Python Environment 01](../media/create-venv.png)
 
-![Creating Python Environment 02](../media/06.03.2024_12.16.15_REC.png)
+![Creating Python Environment 02](../media/python-3.11.png)
    
 6. Create a copy and then rename the file `local.settings.json.template` to `local.settings.json` and update it with your environment information.  
    
