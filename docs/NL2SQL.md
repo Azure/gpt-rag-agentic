@@ -279,12 +279,11 @@ Example of a local measure JSON:
 }
 ```
 
-### **Indexing Workflow**
+### **How to Ingest the Data Dictionary**
 
-The indexing process reads JSON files and populates the search indexes using Azure OpenAI Embeddings.
+Every data dictionary element is indexed into an AI Search Index based on its element type: measure, table, or query. This process is handled by an AI Search Indexer, which runs on a scheduled basis or can be triggered manually. 
 
-The diagram below illustrates the NL2SQL data ingestion pipeline:
-
+The diagram below illustrates the NL2SQL data ingestion pipeline:  
 
 ![NL2SQL Ingestion Pipeline](../media/nl2sql_ingestion_pipeline.png)
 <BR>*NL2SQL Ingestion Pipeline*
@@ -309,5 +308,5 @@ The diagram below illustrates the NL2SQL data ingestion pipeline:
      - Tables are indexed in `nl2sql-tables`.
      - Measures are indexed in `nl2sql-measures`.
 
-> [!NOTE]
-> Ensure that files are placed in their designated folders, as the indexers only scan specific subfolders.
+> [!NOTE]  
+> For proper indexing, ensure that files are placed in their designated folders, as the indexers only scan specific subfolders.
