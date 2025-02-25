@@ -132,7 +132,7 @@ For data sources that require secrets—such as those accessed via a **Service P
 ![Sample Datasource Secrets](../media/admin-guide-datasource-secrets.png)
 <BR>*Sample Datasource Secrets*
 
-> [!Note]
+> [!Tip]
 > Example data source configuration files are available in the [sample folder](../samples/fabric/datasources.json).
 
 ---
@@ -161,7 +161,8 @@ The file names are flexible and should follow a clear naming convention for easy
 - Measure files should use the measure name (e.g., `total_revenue.json`).
 - Query files should have descriptive names that indicate their purpose (e.g., `top_5_expensive_products.json`).
 
-**Note:** The `datasource` field can be any name of your choice. This name will be used to reference the datasource within GPT-RAG and must contain only alphanumeric characters and dashes.
+> [!NOTE]
+> The `datasource` field can be any name of your choice. This name will be used to reference the datasource within GPT-RAG and must contain only alphanumeric characters and dashes.
 
 ### **Data Dictionary Elements**
 
@@ -278,6 +279,9 @@ Example of a local measure JSON:
     "source_table": "sales_order"
 }
 ```
+
+> [!Tip]
+> You can find more exampes in the [samples folder](../samples/).
 
 ### **How to Ingest the Data Dictionary**
 
