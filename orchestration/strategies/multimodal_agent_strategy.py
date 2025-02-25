@@ -199,7 +199,10 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         )
 
         ## Chat Closure Agent
-        chat_closure_prompt = await self._read_prompt("chat_closure")
+        prompt_name = "chat_closure"
+        if optimize_for_audio:
+            prompt_name += "_audio"
+        chat_closure_prompt = await self._read_prompt(prompt_name)
         chat_closure = AssistantAgent(
             name="chat_closure",
             system_message=chat_closure_prompt,

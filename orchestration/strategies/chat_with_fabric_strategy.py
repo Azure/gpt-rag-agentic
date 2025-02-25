@@ -144,7 +144,10 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         # query_agents = SocietyOfMindAgent("query_agents", team=inner_team, response_prompt=response_prompt, model_client=self._get_model_client())
 
         ## Chat Closure Agent
-        chat_closure_prompt = await self._read_prompt("chat_closure")
+        prompt_name = "chat_closure"
+        if optimize_for_audio:
+            prompt_name += "_audio"
+        chat_closure_prompt = await self._read_prompt(prompt_name)
         chat_closure = AssistantAgent(
             name="chat_closure",
             system_message=chat_closure_prompt,
