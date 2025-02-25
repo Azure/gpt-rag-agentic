@@ -1,6 +1,6 @@
 # NL2SQL and Chat with Fabric Scenarios
 
-This document provides an overview of how **NL2SQL**, **NL2SQL Few-Shot**, and **Chat with Fabric** scenarios work within the GPT-RAG Agentic Orchestrator. It explores the key components, including architecture, agent orchestration, authentication methods, and the configuration of data sources and data dictionaries.
+This page provides an overview of how **NL2SQL**, **NL2SQL Few-Shot**, and **Chat with Fabric** scenarios work within the GPT-RAG Agentic Orchestrator. It explores the key components, including architecture, agent orchestration, authentication methods, and the configuration of data sources and data dictionaries.
 
 ## Table of Contents
 
