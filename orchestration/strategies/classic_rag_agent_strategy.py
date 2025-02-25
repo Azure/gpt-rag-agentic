@@ -23,7 +23,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = CLASSIC_RAG
 
-    async def create_agents(self, history, client_principal=None, access_token=None):
+    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
         """
         Classic RAG creation strategy that creates the basic agents and registers functions.
         
@@ -65,7 +65,10 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         )
 
         ## Chat Closure Agent
-        chat_closure_prompt = await self._read_prompt("chat_closure")
+        if optimize_for_audio:
+            chat_closure_prompt = await self._read_prompt("chat_closure_audio")
+        else:
+            chat_closure_prompt = await self._read_prompt("chat_closure")        
         chat_closure = AssistantAgent(
             name="chat_closure",
             system_message=chat_closure_prompt,

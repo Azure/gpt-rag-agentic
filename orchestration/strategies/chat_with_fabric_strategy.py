@@ -47,7 +47,7 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         super().__init__()
         self.strategy_type = CHAT_WITH_FABRIC
 
-    async def create_agents(self, history, client_principal=None, access_token=None):
+    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
         
         # Model Context
         shared_context = await self._get_model_context(history)  
