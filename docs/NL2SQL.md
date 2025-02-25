@@ -1,6 +1,6 @@
 # NL2SQL and Chat with Fabric Scenarios
 
-This document explains how **NL2SQL**, **NL2SQL Few-Shot**, and **Chat with Fabric** scenarios function within the GPT-RAG Agentic Orchestrator. It covers the architecture, agent orchestration, authentication models and setup, data sources and data dictionaries configuration.
+This page provides an overview of how **NL2SQL**, **NL2SQL Few-Shot**, and **Chat with Fabric** scenarios work within the GPT-RAG Agentic Orchestrator. It explores the key components, including architecture, agent orchestration, authentication methods, and the configuration of data sources and data dictionaries.
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@ This document explains how **NL2SQL**, **NL2SQL Few-Shot**, and **Chat with Fabr
 
 These scenarios extend the GPT-RAG Agentic Orchestrator's ability to convert user requests into SQL or DAX queries, supporting **Azure SQL Database** and **Microsoft Fabric** as data sources.
 
-- In **NL2SQL** strategies, the orchestrator uses ODBC drivers to connect to SQL databases. By default, it authenticates using **Managed Identity** if available or retrieves SQL credentials from **Azure Key Vault**.
+- In **NL2SQL** strategies, the orchestrator uses ODBC drivers to connect to SQL databases. It can authenticate using either **Managed Identity** or **SQL Database authentication** with credentials stored in **Azure Key Vault**.
 - In **Chat with Fabric**, SQL endpoints are accessed using a **Service Principal** via ODBC. For semantic models like **Power BI datasets**, connections are made through the **REST API**, using either delegated authentication or a service principal depending on the scenario.
 
 ![NL2SQL Architecture Diagram](../media/nlsql-architecture.png)
@@ -47,7 +47,8 @@ The orchestrator employs a multi-agent system to process queries and manage conv
 - **NL2SQL Few-Shot:** Excludes the DAX Query Agent.
 - **NL2SQL:** Excludes both the DAX Query Agent and the tool for retrieving similar queries.
 
-> **TIP:** You can create custom variations of these strategies to fit your project requirements.
+> [!TIP]
+> You can create custom variations of these strategies to fit your project requirements.
 
 ---
 
@@ -131,7 +132,8 @@ For data sources that require secrets—such as those accessed via a **Service P
 ![Sample Datasource Secrets](../media/admin-guide-datasource-secrets.png)
 <BR>*Sample Datasource Secrets*
 
-> **NOTE:** Example configuration files are available in the [sample folder](../samples/fabric/datasources.json).
+> [!Note]
+> Example data source configuration files are available in the [sample folder](../samples/fabric/datasources.json).
 
 ---
 
