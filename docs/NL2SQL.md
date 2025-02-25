@@ -132,7 +132,8 @@ For data sources that require secrets—such as those accessed via a **Service P
 ![Sample Datasource Secrets](../media/admin-guide-datasource-secrets.png)
 <BR>*Sample Datasource Secrets*
 
-> **NOTE:** Example configuration files are available in the [sample folder](../samples/fabric/datasources.json).
+> [!Note]
+> Example data source configuration files are available in the [sample folder](../samples/fabric/datasources.json).
 
 ---
 
