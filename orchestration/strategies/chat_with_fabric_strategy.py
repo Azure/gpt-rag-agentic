@@ -30,6 +30,9 @@ class ChatGroupResponse(BaseModel):
     answer: str
     reasoning: str
 
+class ChatGroupTextOnlyResponse(BaseModel):
+    answer: str
+
 class DataSource(BaseModel):
     name: str
     description: str
@@ -144,14 +147,16 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         # query_agents = SocietyOfMindAgent("query_agents", team=inner_team, response_prompt=response_prompt, model_client=self._get_model_client())
 
         ## Chat Closure Agent
-        prompt_name = "chat_closure"
         if optimize_for_audio:
-            prompt_name += "_audio"
-        chat_closure_prompt = await self._read_prompt(prompt_name)
+            prompt_name = "chat_closure_audio"
+            chat_group_response_type = ChatGroupTextOnlyResponse
+        else:
+            prompt_name = "chat_closure"
+            chat_group_response_type = ChatGroupResponse
         chat_closure = AssistantAgent(
             name="chat_closure",
-            system_message=chat_closure_prompt,
-            model_client=self._get_model_client(response_format=ChatGroupResponse)
+            system_message=await self._read_prompt(prompt_name),
+            model_client=self._get_model_client(response_format=chat_group_response_type)
         )
         
         # Group Chat Configuration

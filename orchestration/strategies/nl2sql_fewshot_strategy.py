@@ -22,6 +22,9 @@ class ChatGroupResponse(BaseModel):
     answer: str
     reasoning: str
 
+class ChatGroupTextOnlyResponse(BaseModel):
+    answer: str
+
 # Agents Strategy Class
 
 class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
@@ -78,15 +81,17 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
             model_context=shared_context
         )
 
-        ## Chat closure agent
-        prompt_name = "chat_closure"
+        ## Chat Closure Agent
         if optimize_for_audio:
-            prompt_name += "_audio"
-        chat_closure_prompt = await self._read_prompt(prompt_name)
+            prompt_name = "chat_closure_audio"
+            chat_group_response_type = ChatGroupTextOnlyResponse
+        else:
+            prompt_name = "chat_closure"
+            chat_group_response_type = ChatGroupResponse
         chat_closure = AssistantAgent(
             name="chat_closure",
-            system_message=chat_closure_prompt,
-            model_client=self._get_model_client(response_format=ChatGroupResponse)
+            system_message=await self._read_prompt(prompt_name),
+            model_client=self._get_model_client(response_format=chat_group_response_type)
         )
         
         # Group Chat Configuration

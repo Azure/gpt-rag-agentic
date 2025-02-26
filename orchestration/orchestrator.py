@@ -10,9 +10,6 @@ from autogen_agentchat.teams import SelectorGroupChat
 from connectors import CosmosDBClient
 from .agent_strategy_factory import AgentStrategyFactory
 
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
 """
 Orchestrator Class
 
@@ -66,7 +63,6 @@ Differences between Approaches:
 
 class Orchestrator:
     def __init__(self, conversation_id: str, client_principal: dict = None, access_token: str = None):
-        self._setup_logging()
         self.client_principal = client_principal
         self.access_token = access_token
         self.conversation_id = self._use_or_create_conversation_id(conversation_id)
@@ -194,7 +190,8 @@ class Orchestrator:
 
             try:
                 msg = self._parse_message(msg_str)
-            except Exception:
+            except Exception as e:
+                logging.debug(f"Exception while parsing message: {e}")
                 continue
 
             # Skip messages from the user.
@@ -347,10 +344,6 @@ class Orchestrator:
     ###########################################################################
     ## Common
     ###########################################################################
-
-    def _setup_logging(self):
-        logging.getLogger('azure').setLevel(logging.WARNING)
-        logging.basicConfig(level=os.environ.get('LOGLEVEL', 'DEBUG').upper())
 
     def _use_or_create_conversation_id(self, conversation_id: str) -> str:
         if not conversation_id:
