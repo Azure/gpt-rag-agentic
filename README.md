@@ -137,7 +137,10 @@ Ensure the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly se
 
 ### Cloud Deployment
 
-**Option 1: Deploy the orchestrator to the cloud using the Azure Developer CLI**
+There are two main options for deploying the orchestrator to the cloud:
+
+#### **Option 1: Deploy using the Azure Developer CLI (Recommended)**
+If you have previously provisioned GPT-RAG components using `azd provision`, this is the best approach, as it ensures deployment consistency with the existing infrastructure.
 
 ```bash
 azd auth login
@@ -145,24 +148,30 @@ azd env refresh
 azd deploy
 ```
 
-Ensure [Python 3.11](https://www.python.org/downloads/release/python-3118/) and [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd) are installed.
+This method automatically detects your environment settings, applies necessary configurations, and deploys the orchestrator with minimal manual intervention.
 
-**Option 2: Using Azure Functions Core Tools**
+Ensure you have:
+- [Python 3.11](https://www.python.org/downloads/release/python-3118/)
+- [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd) installed.
+
+#### **Option 2: Deploy using Azure Functions Core Tools**
+If you have not used `azd provision` or are deploying in a standalone manner, you can publish the Function App directly using Azure Functions Core Tools.
 
 ```bash
 az login
 func azure functionapp publish FUNCTION_APP_NAME --python
 ```
 
-*Replace FUNCTION_APP_NAME with your Orchestrator Function App name before running the command* 
+Replace `FUNCTION_APP_NAME` with the actual name of your Function App.
 
-After finishing the deployment run the following command to confirm the function was deployed:  
+After deployment, verify the function is available:
 ```bash
 func azure functionapp list-functions FUNCTION_APP_NAME
 ```
 
-Ensure [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local?tabs=windows%2Cisolated-process%2Cnode-v4%2Cpython-v2%2Chttp-trigger%2Ccontainer-apps&pivots=programming-language-python#install-the-azure-functions-core-tools) and  [AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) ar installed.
-
+Ensure you have:
+- [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local?tabs=windows%2Cisolated-process%2Cnode-v4%2Cpython-v2%2Chttp-trigger%2Ccontainer-apps&pivots=programming-language-python#install-the-azure-functions-core-tools)
+- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed.
 
 ### Running the Chat Client Locally
 
