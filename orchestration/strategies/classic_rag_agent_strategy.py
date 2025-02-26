@@ -17,6 +17,9 @@ class ChatGroupResponse(BaseModel):
     answer: str
     reasoning: str
 
+class ChatGroupTextOnlyResponse(BaseModel):
+    answer: str
+
 class ClassicRAGAgentStrategy(BaseAgentStrategy):
 
     def __init__(self):
@@ -66,13 +69,15 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
 
         ## Chat Closure Agent
         if optimize_for_audio:
-            chat_closure_prompt = await self._read_prompt("chat_closure_audio")
+            prompt_name = "chat_closure_audio"
+            chat_group_response_type = ChatGroupTextOnlyResponse
         else:
-            chat_closure_prompt = await self._read_prompt("chat_closure")        
+            prompt_name = "chat_closure"
+            chat_group_response_type = ChatGroupResponse
         chat_closure = AssistantAgent(
             name="chat_closure",
-            system_message=chat_closure_prompt,
-            model_client=self._get_model_client(response_format=ChatGroupResponse)
+            system_message=await self._read_prompt(prompt_name),
+            model_client=self._get_model_client(response_format=chat_group_response_type)
         )
 
         # Agent Configuration

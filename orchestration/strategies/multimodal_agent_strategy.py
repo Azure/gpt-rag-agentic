@@ -29,6 +29,9 @@ class ChatGroupResponse(BaseModel):
     answer: str
     reasoning: str
 
+class ChatGroupTextOnlyResponse(BaseModel):
+    answer: str
+
 class MultimodalMessageCreator(BaseChatAgent):
     """
     A custom agent that constructs a MultiModalMessage from the vector_index_retrieve_wrapper 
@@ -43,7 +46,7 @@ class MultimodalMessageCreator(BaseChatAgent):
             description="An agent that creates `MultiModalMessage` objects from the results of `vector_index_retrieve_wrapper`, executed by an `AssistantAgent` called `retrieval_agent`."
         )
         self._last_multimodal_result = None
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt + "\n\n"
         self._model_context = model_context
 
     @property
@@ -191,19 +194,25 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
         multimodal_creator = MultimodalMessageCreator(name="multimodal_creator", system_prompt=multimodal_rag_message_prompt, model_context=shared_context)
 
         ## Assistant Agent
+        main_assistant_prompt = await self._read_prompt("main_assistant")        
         main_assistant = AssistantAgent(
             name="main_assistant",
-            system_message="You are a helpful assistant who always includes the word QUESTION_ANSWERED at the end of your responses.",
+            system_message=main_assistant_prompt,
             model_client=self._get_model_client(),
             reflect_on_tool_use=True
         )
 
         ## Chat Closure Agent
-        chat_closure_prompt = await self._read_prompt("chat_closure")
+        if optimize_for_audio:
+            prompt_name = "chat_closure_audio"
+            chat_group_response_type = ChatGroupTextOnlyResponse
+        else:
+            prompt_name = "chat_closure"
+            chat_group_response_type = ChatGroupResponse
         chat_closure = AssistantAgent(
             name="chat_closure",
-            system_message=chat_closure_prompt,
-            model_client=self._get_model_client(response_format=ChatGroupResponse)
+            system_message=await self._read_prompt(prompt_name),
+            model_client=self._get_model_client(response_format=chat_group_response_type)
         )
         
         # Agent Configuration

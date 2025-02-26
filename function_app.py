@@ -1,9 +1,20 @@
 # function_app.py
+import asyncio
+import os
+import json
+import logging
+import warnings
 import azure.functions as func
 from azurefunctions.extensions.http.fastapi import Request, StreamingResponse, JSONResponse
-import json
 from orchestration import Orchestrator
-import logging
+
+# Logging configuration
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)        
+logging.getLogger('azure').setLevel(logging.WARNING)
+logging.basicConfig(level=os.environ.get('LOGLEVEL', 'DEBUG').upper(), force=True)
+logging.getLogger("uvicorn.error").propagate = True
+logging.getLogger("uvicorn.access").propagate = True
 
 # Create the Function App with the desired auth level.
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
@@ -49,11 +60,27 @@ async def orchestrator_streaming(req: Request) -> StreamingResponse:
         
         async def stream_generator():
             logging.info("[orcstream_endpoint] Entering stream_generator")
+            last_yield = asyncio.get_event_loop().time()
+            heartbeat_interval = 15  # seconds between heartbeats
+            heartbeat_count = 0
+
             async for chunk in orchestrator.answer_stream(question, text_only=text_only):
-                if text_only:
-                    yield chunk  # Assuming chunk is already a string.
-                else:
-                    yield json.dumps(chunk)
+                now = asyncio.get_event_loop().time()
+                # If the time since the last yield exceeds the heartbeat interval, send a heartbeat
+                if now - last_yield >= heartbeat_interval:
+                    heartbeat_count += 1
+                    logging.info(f"Sending heartbeat #{heartbeat_count}")
+                    if text_only:
+                        # SSE heartbeat: a comment line
+                        yield "\n\n"
+                    else:
+                        yield json.dumps({"heartbeat": heartbeat_count})
+                    last_yield = now
+                if chunk:
+                    logging.info(f"Yielding chunk: {chunk}")
+                    # For text-only mode, yield the raw chunk; else, serialize to JSON.
+                    yield chunk if text_only else json.dumps(chunk)
+                    last_yield = now
         
         media_type = "text/event-stream" if text_only else "application/stream+json"
         return StreamingResponse(stream_generator(), media_type=media_type)
