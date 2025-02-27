@@ -124,7 +124,7 @@ class TableRetrievalItem(BaseModel):
     """
     Represents a single table entry with its name, description, and datasource.
     """
-    table_name: str = Field(..., description="The name of the table")
+    table: str = Field(..., description="The name of the table")
     description: str = Field(..., description="A brief description of the table")
     datasource: Optional[str] = Field(None, description="The datasource used for retrieval")
 
