@@ -97,7 +97,7 @@ async def get_all_tables_info(
     body = {
         "search": "*",
         "filter": filter_expression,
-        "select": "table_name, description, datasource",
+        "select": "table, description, datasource",
         "top": 1000  # Adjust based on your expected document count.
     }
 
@@ -113,7 +113,7 @@ async def get_all_tables_info(
 
         for doc in result.get("value", []):
             table_item = TableItem(
-                table=doc.get("table_name", ""),
+                table=doc.get("table", ""),
                 description=doc.get("description", ""),
                 datasource=doc.get("datasource", "")
             )
@@ -148,12 +148,12 @@ async def get_schema_info(
     search_index = "nl2sql-tables"
     safe_datasource = datasource.replace("'", "''")
     safe_table_name = table_name.replace("'", "''")
-    filter_expression = f"datasource eq '{safe_datasource}' and table_name eq '{safe_table_name}'"
+    filter_expression = f"datasource eq '{safe_datasource}' and table eq '{safe_table_name}'"
 
     body = {
         "search": "*",
         "filter": filter_expression,
-        "select": "table_name, description, datasource, columns",
+        "select": "table, description, datasource, columns",
         "top": 1
     }
 
@@ -171,7 +171,7 @@ async def get_schema_info(
             error_message = f"Table '{table_name}' not found in datasource '{datasource}'."
             return SchemaInfo(
                 datasource=datasource,
-                table=table_name,
+                table=table,
                 error=error_message,
                 columns=None
             )
@@ -188,7 +188,7 @@ async def get_schema_info(
 
         return SchemaInfo(
             datasource=datasource,
-            table=doc.get("table_name", table_name),
+            table=doc.get("table", table_name),
             description=doc.get("description", ""),
             columns=columns
         )
@@ -238,7 +238,7 @@ async def tables_retrieval(
 
         # Prepare the request body.
         body: Dict[str, Any] = {
-            "select": "table_name, description",
+            "select": "table, description",
             "top": search_top_k
         }
         # Apply datasource filter if provided.
@@ -279,10 +279,10 @@ async def tables_retrieval(
         if result.get("value"):
             logging.info(f"[tables] {len(result['value'])} documents retrieved")
             for doc in result["value"]:
-                table_name = doc.get("table_name", "")
+                table_name = doc.get("table", "")
                 description = doc.get("description", "")
                 search_results.append(TableRetrievalItem(
-                    table_name=table_name,
+                    table=table_name,
                     description=description,
                     datasource=datasource
                 ))
