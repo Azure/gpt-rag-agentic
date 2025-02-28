@@ -20,7 +20,7 @@ logging.getLogger("uvicorn.access").propagate = True
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
 @app.route(route="orc", methods=[func.HttpMethod.POST])
-async def orchestrator(req: Request) -> JSONResponse:
+async def orc(req: Request) -> JSONResponse:
     data = await req.json()
     conversation_id = data.get("conversation_id")
     question = data.get("question")
