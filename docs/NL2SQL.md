@@ -8,7 +8,7 @@ This page provides an overview of how **NL2SQL**, **NL2SQL Few-Shot**, and **Cha
 2. [**Agent Orchestration Strategies**](#agent-orchestration-strategies)
    - [2.1 Key Agents and Their Roles](#key-agents-and-their-roles)
    - [2.2 Strategy Variations](#strategy-variations)
-3. [**Authentication Model and Setup**](#authentication-model-and-setup)
+3. **Prerequisites (by data source type)**
    - [3.1 Azure SQL Databases](#azure-sql-databases)
    - [3.2 Microsoft Fabric](#microsoft-fabric)
 4. [**Data Sources Configuration**](#data-sources-configuration)
@@ -20,8 +20,9 @@ This page provides an overview of how **NL2SQL**, **NL2SQL Few-Shot**, and **Cha
 
 These scenarios extend the GPT-RAG Agentic Orchestrator's ability to convert user requests into SQL or DAX queries, supporting **Azure SQL Database** and **Microsoft Fabric** as data sources.
 
-- In **NL2SQL** strategies, the orchestrator uses ODBC drivers to connect to SQL databases. It can authenticate using either **Managed Identity** or **SQL Database authentication** with credentials stored in **Azure Key Vault**.
-- In **Chat with Fabric**, SQL endpoints are accessed using a **Service Principal** via ODBC. For semantic models like **Power BI datasets**, connections are made through the **REST API**, using either delegated authentication or a service principal depending on the scenario.
+- In **NL2SQL** strategies, the orchestrator uses ODBC drivers to connect to Azure SQL databases. It can authenticate using either **Managed Identity** or **SQL Database authentication** with database credentials stored in **Azure Key Vault**.
+
+- In **Chat with Fabric**, SQL endpoints are accessed using a **App Registration** (Service Principal) via ODBC. For semantic models like **Power BI datasets**, connections are made through the **REST API**, using either delegated authentication or a service principal depending on the scenario.
 
 ![NL2SQL Architecture Diagram](../media/nlsql-architecture.png)
 *Architecture Overview*
@@ -52,26 +53,58 @@ The orchestrator employs a multi-agent system to process queries and manage conv
 
 ---
 
-## Authentication Model and Setup
+## Prerequisites (by Data Source Type)
 
-The orchestrator supports different authentication methods depending on the data source. The specific configuration for each data source is explained in more detail in the next section.
+The orchestrator supports different authentication methods depending on the data source used. This section outlines the prerequisites for each data source type. Specific configuration instructions are provided in the next section.
 
 ### **Azure SQL Databases**
-- **Managed Identity (Preferred):** Uses the system-assigned or user-assigned identity of the Azure Function. Ensure that the identity has the `db_datareader` role on the database.  
-- **SQL Server Authentication:** When a `uid` is provided, the password is retrieved from **Azure Key Vault** using the naming convention `{datasource_id}-secret`.
+
+When connecting to **Azure SQL Databases**, you have two authentication options:
+
+- **Managed Identity (Preferred):** Uses the system-assigned or user-assigned identity of the Orchestrator Azure Function. The prerequisite is to ensure that the orchestrator’s managed identity has the `db_datareader` role on the target database.
+
+- **SQL Server Authentication:** Requires a `uid` and password for a user with read access to the database. The password must be stored in **Azure Key Vault**, following the naming convention `{datasource_id}-secret`. Configuration details are provided in the next section.
 
 ### **Microsoft Fabric**
-- **SQL Endpoint:** Uses a **Service Principal / App Registration** with permissions granted via **Entra ID**.  
-- **Semantic Model (Power BI):**  
-  - **Delegated User Tokens:** Used for interactive queries, respecting the user's permissions.  
-  - **Service Principal:** Used for headless scenarios, with permissions assigned at the workspace level.
 
-For **Microsoft Fabric**, a Service Principal must be created. Refer to [Fabric Entra ID Authentication](https://learn.microsoft.com/en-us/fabric/data-warehouse/entra-id-authentication) for instructions on creating an App Registration with the required permissions.
+The Microsoft Fabric connector can be configured in one of the following modes:
 
-To use the **REST API**, the following configurations are required:  
-- Enable **Dataset Execute Queries REST API** under **Integration settings** in the tenant.  
-- Ensure the user has **dataset read** and **build permissions** (see [Manage dataset access permissions](https://learn.microsoft.com/en-us/power-bi/collaborate-share/service-build-permissions)).  
-- Grant the **App Service** the **Dataset.Read.All** permission (see [API Service documentation](https://learn.microsoft.com/en-us/power-bi/developer/embedded/dataset-operations)).
+- **SQL Endpoint:** Used for executing SQL queries on lakehouses and warehouses.
+- **Semantic Model:** Used for executing DAX queries on Power BI datasets.
+
+#### **SQL Endpoint**
+
+SQL Endpoint connections use the **Microsoft ODBC Driver** and authenticate via an **App Registration** in **Entra ID**.
+
+The prerequisites include:
+
+1. Creating an App Registration in Entra ID.
+2. Adding the App Registration to a security group for easier access management.
+3. Enabling **Service principals can use Fabric APIs** under **Developer settings** in the tenant.
+
+![Fabric Configuration - Semantic Model](../media/semantic-model-configuration02.png)  
+*Developer settings*
+
+4. Assigning the Viewer role to the App Registration or security group in the target workspace.
+
+For more details, refer to: [Entra ID Authentication for SQL Endpoint](https://learn.microsoft.com/en-us/fabric/data-warehouse/entra-id-authentication).
+
+#### **Semantic Model**
+
+Semantic model connections are based on the **Power BI REST API** and require the following:
+
+1. Creating an App Registration in Entra ID.
+2. Adding the App Registration to a security group for access management.
+3. Grant **Dataset.Read.All** permission to your App Service: Go to **App Registration > API permissions > Add a permission**, select **Power BI Service > Delegated permissions**, then choose **Dataset.Read.All**.
+
+4. Enabling **Semantic Model Execute Queries REST API** under **Integration settings** in the tenant.
+
+![Fabric Configuration - Semantic Model](../media/semantic-model-configuration.png)  
+*Integration settings*
+
+5. Ensuring users have **dataset read** and **build permissions** on the semantic model.
+
+For more details, refer to: [Power BI REST API Guide](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries).
 
 ---
 
