@@ -7,5 +7,5 @@ class NL2SQLBaseStrategy(BaseAgentStrategy, ABC):
         super().__init__()
     
     @abstractmethod
-    def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
+    async def create_agents(self, history, client_principal=None, access_token=None, output_mode=None, output_format=None):
         pass

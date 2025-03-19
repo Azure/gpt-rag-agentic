@@ -1,5 +1,5 @@
 from typing import Annotated
-from pydantic import BaseModel
+
 
 from autogen_agentchat.agents import AssistantAgent
 from autogen_core.tools import FunctionTool
@@ -9,24 +9,17 @@ from tools import vector_index_retrieve
 from tools.ragindex.types import VectorIndexRetrievalResult
 
 from .base_agent_strategy import BaseAgentStrategy
-from ..constants import CLASSIC_RAG
+from ..constants import Strategy
 
-## Agent Response Types
-
-class ChatGroupResponse(BaseModel):
-    answer: str
-    reasoning: str
-
-class ChatGroupTextOnlyResponse(BaseModel):
-    answer: str
+from autogen_agentchat.messages import ToolCallSummaryMessage
 
 class ClassicRAGAgentStrategy(BaseAgentStrategy):
 
     def __init__(self):
         super().__init__()
-        self.strategy_type = CLASSIC_RAG
+        self.strategy_type = Strategy.CLASSIC_RAG
 
-    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
+    async def create_agents(self, history, client_principal=None, access_token=None, output_mode=None, output_format=None):
         """
         Classic RAG creation strategy that creates the basic agents and registers functions.
         
@@ -39,6 +32,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         Note:
         To use a different model for an specific agent, instantiate a separate AzureOpenAIChatCompletionClient and assign it instead of using self._get_model_client().
         """
+
         # Model Context
         shared_context = await self._get_model_context(history) 
 
@@ -57,7 +51,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         # Agents
 
         ## Main Assistant Agent
-        assistant_prompt = await self._read_prompt("classic_rag_assistant")
+        assistant_prompt = await self._read_prompt("main_assistant")
         main_assistant = AssistantAgent(
             name="main_assistant",
             system_message=assistant_prompt,
@@ -68,17 +62,7 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
         )
 
         ## Chat Closure Agent
-        if optimize_for_audio:
-            prompt_name = "chat_closure_audio"
-            chat_group_response_type = ChatGroupTextOnlyResponse
-        else:
-            prompt_name = "chat_closure"
-            chat_group_response_type = ChatGroupResponse
-        chat_closure = AssistantAgent(
-            name="chat_closure",
-            system_message=await self._read_prompt(prompt_name),
-            model_client=self._get_model_client(response_format=chat_group_response_type)
-        )
+        chat_closure = await self._create_chat_closure_agent(output_format, output_mode)
 
         # Agent Configuration
 
@@ -98,11 +82,15 @@ class ClassicRAGAgentStrategy(BaseAgentStrategy):
             last_msg = messages[-1]
             if last_msg.source == "user":
                 return "main_assistant"
-            else:
-                return None     
+            if last_msg.source == "main_assistant" and isinstance(last_msg, ToolCallSummaryMessage):
+                return "main_assistant"
+            if last_msg.source in ["main_assistant"]:
+                return "chat_closure"                 
+            return None
+
         
         self.selector_func = custom_selector_func
         
         self.agents = [main_assistant, chat_closure]
         
-        return self._get_agent_configuration()
+        return self._get_agents_configuration()

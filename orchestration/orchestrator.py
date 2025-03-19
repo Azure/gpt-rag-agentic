@@ -4,393 +4,88 @@ import os
 import re
 import time
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime
 
+from .constants import Strategy, OutputFormat, OutputMode
 from autogen_agentchat.teams import SelectorGroupChat
 from connectors import CosmosDBClient
 from .agent_strategy_factory import AgentStrategyFactory
 
-"""
-Orchestrator Class
 
-The `Orchestrator` class manages conversations using different agent strategies, supporting:
+# ---------- Configuration & Dependency Classes ----------
 
-1. **Non-Streaming**: Returns the final response as a dictionary after processing the input.
-2. **Streaming**: Streams intermediate responses as dictionaries and the final response when complete.
-3. **Streaming (Text-Only)**: Streams only the final response as plain text without intermediate messages.
+class OrchestratorConfig:
+    def __init__(
+        self,
+        conversation_container: str = None,
+        storage_account: str = None,
+        documents_container: str = None,
+        orchestration_strategy: Strategy = None,
+    ):
+        self.conversation_container = conversation_container or os.environ.get('CONVERSATION_CONTAINER', 'conversations')
+        self.storage_account = storage_account or os.environ.get('AZURE_STORAGE_ACCOUNT', 'your_storage_account')
+        self.documents_container = documents_container or os.environ.get('AZURE_STORAGE_CONTAINER', 'documents')
+        strategy_from_env = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag').replace('-', '_')
+        self.orchestration_strategy = (orchestration_strategy or Strategy(strategy_from_env))
 
-Initialization:
-    Orchestrator(conversation_id: str, client_principal: dict = None, access_token: str = None)
-        - conversation_id (str): Unique identifier for the conversation.
-        - client_principal (dict, optional): User information including `id` and `name`.
-        - access_token (str, optional): Token used for authentication.
 
-Methods:
-    async answer(self, ask: str) -> dict
-        Generates a response using the selected agent strategy.
-        Args:
-            ask (str): User's question or prompt.
-        Returns:
-            dict: Final response with the following keys:
-                - `conversation_id (str)`: The unique ID of the conversation.
-                - `answer (str)`: The generated response.
-                - `reasoning (str)`: The reasoning or thought process leading to the answer.
-                - `thoughts (list[dict])`: Intermediate messages exchanged during the conversation.
-                - `data_points (list[str])`: Extracted data references from tools or documents.
-
-    async answer_stream(self, ask: str, text_only: bool = False)
-        Streams responses as they are generated.
-        Args:
-            ask (str): User's question or prompt.
-            text_only (bool, optional): If True, only the final answer is streamed as plain text. Default is False.
-        Yields:
-            - When `text_only=False`:
-                dict: Intermediate and final responses with:
-                    - `source (str)`: The message source (e.g., "assistant", "tool").
-                    - `message_type (str)`: The type of message (e.g., "TextMessage").
-                    - `models_usage (str)`: Information about model usage.
-                    - `content (str)`: The message content.
-                    - `final_answer (str)`: "true" for the final message, otherwise "false".
-            - When `text_only=True`:
-                str: The final answer as plain text, prefixed by the conversation ID.
-
-Differences between Approaches:
-
-- **Non-Streaming:** Provides the entire response at once after processing.
-- **Streaming:** Delivers messages progressively, allowing real-time feedback.
-- **Streaming (Text-Only):** Outputs only the final response, suitable for minimal output needs.
-"""
-
-class Orchestrator:
-    def __init__(self, conversation_id: str, client_principal: dict = None, access_token: str = None):
+class ConversationManager:
+    def __init__(self, cosmosdb_client: CosmosDBClient, config: OrchestratorConfig,
+                 client_principal: dict, conversation_id: str):
+        self.cosmosdb = cosmosdb_client
+        self.config = config
         self.client_principal = client_principal
-        self.access_token = access_token
         self.conversation_id = self._use_or_create_conversation_id(conversation_id)
         self.short_id = self.conversation_id[:8]
-        self.cosmosdb = CosmosDBClient()
-        self.optimize_for_audio = False
-        self.conversations_container = os.environ.get('CONVERSATION_CONTAINER', 'conversations')
-        self.storage_account = os.environ.get('AZURE_STORAGE_ACCOUNT', 'your_storage_account')
-        self.documents_container = os.environ.get('AZURE_STORAGE_CONTAINER', 'documents')
-        orchestration_strategy = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag').replace('-', '_')
-        self.agent_strategy = AgentStrategyFactory.get_strategy(orchestration_strategy)
-
-    ###########################################################################
-    ## Non-Streaming API
-    ###########################################################################
-
-    async def answer(self, ask: str) -> dict:
-        start_time = time.time()
-
-        # Get existing conversation or create a new one
-        conversation = await self._get_or_create_conversation()
-        history = conversation.get("history", [])
-        
-        # Create agents and initiate group chat
-        agent_configuration = await self._create_agents_with_strategy(history)
-        answer_dict = await self._initiate_group_chat(agent_configuration, ask)
-
-        # Update conversation with new chat log
-        await self._update_conversation(conversation, ask, answer_dict['answer'])
-        
-        response_time = time.time() - start_time
-        logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")
-        return answer_dict
-
-    async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
-        try:
-            logging.info(f"[orchestrator] {self.short_id} Creating group chat via SelectorGroupChat.")
-
-            # Run agent chat
-            group_chat = SelectorGroupChat(
-                participants=agent_configuration["agents"],
-                model_client=agent_configuration["model_client"],
-                termination_condition=agent_configuration["termination_condition"],
-                selector_func=agent_configuration["selector_func"],
-            )
-            result = await group_chat.run(task=ask)
-
-            # Get answer, thoughts and reasoning from last message
-            reasoning = ""
-            last_message = result.messages[-1].content if result.messages else '{"answer":"No answer provided."}'
-            try:
-                if isinstance(last_message, list):
-                    message_data = last_message
-                elif isinstance(last_message, (str, bytes, bytearray)):
-                    message_data = json.loads(last_message)
-                else:
-                    raise TypeError("Expected last_message to be str, bytes, or list, got: " + str(type(last_message)))
-                answer = message_data.get("answer", "Oops! The agent team did not generate a response for the user.")
-                reasoning = message_data.get("reasoning", "")
-            except json.JSONDecodeError:
-                answer = "Oops! The agent team did not generate a response for the user."
-                logging.warning(f"[orchestrator] {self.short_id} Error: Malformed JSON. Using default values for answer and thoughts")
-
-            if answer.endswith(agent_configuration['terminate_message']):
-                answer = answer[:-len(agent_configuration['terminate_message'])].strip()
-            
-            # Get data points from chat log
-            chat_log = self._get_chat_log(result.messages)
-            data_points = self._get_data_points(chat_log)
-            
-            answer_dict = {"conversation_id": self.conversation_id, 
-                           "answer": answer,
-                           "reasoning": reasoning,                                   
-                           "thoughts": chat_log,                   
-                           "data_points": data_points}
-
-            return answer_dict
-
-        except Exception as e:
-            logging.error(f"[orchestrator] {self.short_id} An error occurred: {str(e)}", exc_info=True)
-            answer_dict = {"conversation_id": self.conversation_id, 
-                           "answer": f"We encountered an issue processing your request. Please try again later. Error {str(e)}",
-                           "reasoning": "", 
-                           "thoughts": [], 
-                           "data_points": []}
-            return answer_dict  
-
-
-    ###########################################################################
-    ## Streaming API
-    ###########################################################################
-
-    async def answer_stream(self, ask: str, text_only: bool = False):
-        """
-        Streaming version of answer() using the group chat's run_stream method.
-        
-        In text_only mode:
-        - Only the final answer (with termination keyword removed and formatting cleaned)
-            is yielded as plain text with the conversation_id prepended.
-        Otherwise:
-        - Intermediate messages are yielded as dictionaries, with content truncated when needed.
-        
-        Finally, the conversation is updated with only the final answer text.
-        """
-        MAX_CONTENT_SIZE = 500
-        self.optimize_for_audio = text_only
-        conversation = await self._get_or_create_conversation()
-        history = conversation.get("history", [])
-        agent_config = await self._create_agents_with_strategy(history)
-        terminate_keyword = agent_config.get("terminate_message", "TERMINATE")
-
-        group_chat = SelectorGroupChat(
-            participants=agent_config["agents"],
-            model_client=agent_config["model_client"],
-            termination_condition=agent_config["termination_condition"],
-            selector_func=agent_config["selector_func"],
-        )
-        stream = group_chat.run_stream(task=ask)
-        final_answer = ""
-
-        async for response in stream:
-            msg_str = str(response)
-            if "TaskResult(" in msg_str:
-                continue
-
-            try:
-                msg = self._parse_message(msg_str)
-            except Exception as e:
-                logging.debug(f"Exception while parsing message: {e}")
-                continue
-
-            # Skip messages from the user.
-            if msg.get("source", "") == "user":
-                continue
-
-            msg_type = msg.get("type", "")
-            if msg_type == "ToolCallRequestEvent":
-                # Yield tool events if not in text_only mode.
-                for output in self._handle_tool_event(msg, text_only):
-                    yield output
-
-            elif msg_type == "TextMessage":
-                should_break, final_text, outputs = self._handle_text_message(
-                    msg, text_only, terminate_keyword, MAX_CONTENT_SIZE
-                )
-                if final_text:
-                    final_answer = final_text
-                for output in outputs:
-                    yield output
-                if should_break:
-                    break
-
-            else:
-                continue
-
-        # Update the conversation with the final answer.
-        await self._update_conversation(conversation, ask, final_answer)
-
-    def _parse_message(self, message_str: str) -> dict:
-        """
-        Extract key/value pairs from a message string.
-        Expected format: key='value' or key=value (with some handling for nested parentheses/brackets).
-        """
-        pattern = r"(\w+)=((?:'(?:\\'|[^'])*'|\"(?:\\\"|[^\"])*\"|\[[^\]]+\]|\([^\)]+\)|[^\s]+))"
-        pairs = re.findall(pattern, message_str)
-        result = {}
-
-        for key, value in pairs:
-            if (value.startswith("'") and value.endswith("'")) or (value.startswith("\"") and value.endswith("\"")):
-                value = value[1:-1]  # Remove surrounding quotes.
-            result[key] = value
-
-        # Handle cases where models_usage might be split.
-        if 'models_usage' in result and result['models_usage'].startswith('RequestUsage'):
-            start_index = message_str.find('models_usage=')
-            if start_index != -1:
-                usage_str = message_str[start_index:].split(' ', 1)[1]
-                usage_match = re.match(r"RequestUsage\((.*?)\)", usage_str)
-                if usage_match:
-                    result['models_usage'] = usage_match.group(1)
-
-        return result
-
-    def _handle_tool_event(self, msg: dict, text_only: bool):
-        """
-        Process a ToolCallRequestEvent message.
-        Yields a single dictionary output unless text_only mode is enabled.
-        """
-        if text_only:
-            return
-
-        models_usage = msg.get("models_usage", "")
-        fn_name = msg.get("name", "")
-        fn_arguments = msg.get("arguments", "")
-        content = msg.get("content", "")
-        output = {
-            'conversation_id': self.conversation_id, 
-            'source': msg.get("source", ""),
-            'message_type': msg.get("type", ""),
-            'models_usage': models_usage,
-            'name': fn_name,
-            'arguments': fn_arguments,
-            'final_answer': "false",
-            'content': f"Calling {fn_name}" if fn_name else content,
-        }
-        yield output
-
-    def _handle_text_message(self, msg: dict, text_only: bool, terminate_keyword: str, max_content_size: int):
-        """
-        Process a TextMessage. Returns a tuple:
-            (should_break, final_text, outputs)
-        where:
-        - should_break: True if this was the final message and streaming should stop.
-        - final_text: The final answer text (if any).
-        - outputs: A list of outputs to yield.
-        """
-        raw_content = msg.get("content", "")
-        is_final = terminate_keyword in raw_content
-        content = raw_content
-
-        if is_final:
-            content = content.replace(terminate_keyword, "").strip()
-        elif len(content) > max_content_size:
-            content = content[:max_content_size]
-
-        outputs = []
-        final_text = ""
-        should_break = False
-
-        def sanitize_json_string(content: str) -> str:
-            content = content.strip()
-            content = content.replace("\\\'", "'")
-            content = content.replace("\\\\", "\\")
-            if content.startswith("'") and content.endswith("'"):
-                content = content.replace("'", '"')
-            content = re.sub(r'\\[^\\"/bfnrtu]', '', content)
-            return content
-
-        if text_only:
-            if is_final:
-                try:
-                    data = json.loads(content)
-                except json.JSONDecodeError:
-                    sanitized_content = sanitize_json_string(content)
-                    data = json.loads(sanitized_content)
-                except Exception:
-                    data = {}
-                answer_text = data.get("answer", "")
-                answer_text = self._clean_answer_text(answer_text)
-                final_text = answer_text
-                outputs.append(f"{self.conversation_id} {answer_text}")
-                should_break = True
-            # In text_only mode, intermediate messages are not yielded.
-        else:
-            answer_text = content.decode("utf-8") if isinstance(content, bytes) else content
-            outputs.append({
-                'conversation_id': self.conversation_id, 
-                'source': msg.get("source", ""),
-                'message_type': msg.get("type", ""),
-                'models_usage': msg.get("models_usage", ""),
-                'name': "",
-                'arguments': "",
-                'final_answer': "true" if is_final else "false",
-                'content': answer_text
-            })
-            if is_final:
-                final_text = answer_text
-
-        return should_break, final_text, outputs
-
-    def _clean_answer_text(self, text: str) -> str:
-        text = re.sub(r'\[.*?\]', '', text)             # Remove all text between square brackets.
-        text = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', text)  # Remove markdown links.
-        text = re.sub(r'#+', '', text)                  # Remove markdown headers.
-        text = re.sub(r'[_*`]', '', text)               # Remove formatting characters.
-        text = re.sub(r'\s+', ' ', text).strip()        # Collapse whitespace.
-        return text
-
-    ###########################################################################
-    ## Common
-    ###########################################################################
 
     def _use_or_create_conversation_id(self, conversation_id: str) -> str:
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
-            logging.info(f"[orchestrator] Creating new conversation_id. {conversation_id}")
+            logging.info(f"[orchestrator] Creating new conversation_id: {conversation_id}")
         return conversation_id
 
-    async def _get_or_create_conversation(self) -> dict:
-        conversation = await self.cosmosdb.get_document(self.conversations_container, self.conversation_id)
+    async def get_or_create_conversation(self) -> dict:
+        conversation = await self.cosmosdb.get_document(self.config.conversation_container, self.conversation_id)
         if not conversation:
             new_conversation = {
                 "id": self.conversation_id,
                 "start_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "user_id": self.client_principal.get("id", "unknown"),
-                "user_name": self.client_principal.get("name", "anonymous"),
+                "user_id": self.client_principal.get("id", "unknown") if self.client_principal else "unknown",
+                "user_name": self.client_principal.get("name", "anonymous") if self.client_principal else "anonymous",
                 "conversation_id": self.conversation_id,
-                "history": []  # initialize an empty shared chat log
+                "history": []  # initialize an empty chat log
             }
-            conversation = await self.cosmosdb.create_document(self.conversations_container, self.conversation_id, new_conversation)
+            conversation = await self.cosmosdb.create_document(self.config.conversation_container, self.conversation_id, new_conversation)
             logging.info(f"[orchestrator] {self.short_id} Created new conversation.")
         else:
             logging.info(f"[orchestrator] {self.short_id} Retrieved existing conversation.")
         return conversation
 
-    async def _update_conversation(self, conversation: dict, ask: str, answer: str):
+    async def update_conversation(self, conversation: dict, ask: str, answer: str):
         logging.info(f"[orchestrator] {self.short_id} Updating conversation.")
-        # Retrieve the existing chat_log (if any) and extend it.
         history = conversation.get("history", [])
-        history.extend([{"speaker": "user", "content": ask},{"speaker": "assistant", "content": answer}])
-        # Create the simplified conversation document.
+        history.extend([
+            {"speaker": "user", "content": ask},
+            {"speaker": "assistant", "content": answer}
+        ])
         simplified_conversation = {
             "id": self.conversation_id,
             "start_date": conversation.get("start_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "user_id": self.client_principal.get("id", "unknown"),
-            "user_name": self.client_principal.get("name", "anonymous"),
+            "user_id": self.client_principal.get("id", "unknown") if self.client_principal else "unknown",
+            "user_name": self.client_principal.get("name", "anonymous") if self.client_principal else "anonymous",
             "conversation_id": self.conversation_id,
             "history": history
         }
-        await self.cosmosdb.update_document(self.conversations_container, simplified_conversation)
+        await self.cosmosdb.update_document(self.config.conversation_container, simplified_conversation)
         logging.info(f"[orchestrator] {self.short_id} Finished updating conversation.")
 
 
-    async def _create_agents_with_strategy(self, history: list[dict]) -> list:
-        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
-        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token, self.optimize_for_audio)
+# ---------- Parsing Helpers ----------
 
-    def _get_chat_log(self, messages):
+class ChatLogParser:
+    @staticmethod
+    def get_chat_log(messages) -> list:
         def make_serializable(obj):
             if isinstance(obj, (list, tuple)):
                 return [make_serializable(item) for item in obj]
@@ -404,16 +99,21 @@ class Orchestrator:
         chat_log = []
         for msg in messages:
             safe_content = make_serializable(msg.content)
-            chat_log.append({"speaker": msg.source, "message_type": msg.type, "content": safe_content})
+            chat_log.append({
+                "speaker": msg.source,
+                "message_type": msg.type,
+                "content": safe_content
+            })
         return chat_log
 
-    def _get_data_points(self, chat_log):
+    @staticmethod
+    def extract_data_points(chat_log) -> list:
         data_points = []
         call_id_map = {}
         allowed_extensions = {'vtt', 'xlsx', 'xls', 'pdf', 'png', 'jpeg', 'jpg', 'bmp', 'tiff', 'docx', 'pptx'}
         extension_pattern = "|".join(allowed_extensions)
         pattern = rf'[\w\-.]+\.(?:{extension_pattern}): .*?(?=(?:[\w\-.]+\.(?:{extension_pattern})\:)|$)'
-        if chat_log: 
+        if chat_log:
             for msg in chat_log:
                 try:
                     if "message_type" in msg and "content" in msg and isinstance(msg["content"], list) and msg["content"]:
@@ -432,7 +132,189 @@ class Orchestrator:
                                         entries = re.findall(pattern, data, re.DOTALL | re.IGNORECASE)
                                         data_points.extend(entries)
                 except Exception as e:
-                    logging.warning(f"[orchestrator] {self.short_id} Error processing message: {e}.")
+                    logging.warning(f"[orchestrator] Error processing message: {e}.")
         else:
-            logging.warning(f"[orchestrator] {self.short_id} Chat log is empty or not provided.")
+            logging.warning("[orchestrator] Chat log is empty or not provided.")
         return data_points
+
+
+class MessageParser:
+    @staticmethod
+    def parse_message(message_str: str) -> dict:
+        pattern = r"(\w+)=((?:'(?:\\'|[^'])*'|\"(?:\\\"|[^\"])*\"|\[[^\]]+\]|\([^\)]+\)|[^\s]+))"
+        pairs = re.findall(pattern, message_str)
+        result = {}
+        for key, value in pairs:
+            if (value.startswith("'") and value.endswith("'")) or (value.startswith("\"") and value.endswith("\"")):
+                value = value[1:-1]
+            result[key] = value
+        if 'models_usage' in result and result['models_usage'].startswith('RequestUsage'):
+            start_index = message_str.find('models_usage=')
+            if start_index != -1:
+                usage_str = message_str[start_index:].split(' ', 1)[1]
+                usage_match = re.match(r"RequestUsage\((.*?)\)", usage_str)
+                if usage_match:
+                    result['models_usage'] = usage_match.group(1)
+        return result
+
+
+# ---------- Orchestrators ----------
+
+class BaseOrchestrator(ABC):
+    def __init__(
+        self,
+        conversation_id: str,
+        config: OrchestratorConfig,
+        client_principal: dict = None,
+        access_token: str = None,
+        agent_strategy=None
+    ):
+        self.client_principal = client_principal
+        self.access_token = access_token
+        self.cosmosdb =  CosmosDBClient()
+        self.conversation_manager = ConversationManager(self.cosmosdb, config, client_principal, conversation_id)
+        self.conversation_id = self.conversation_manager.conversation_id
+        self.short_id = self.conversation_id[:8]
+        self.config = config
+
+        # Agent strategy is injected if provided; otherwise, use the factory.
+        if agent_strategy:
+            self.agent_strategy = agent_strategy
+        else:
+            strategy_key = config.orchestration_strategy
+            self.agent_strategy = AgentStrategyFactory.get_strategy(strategy_key)
+
+    @abstractmethod
+    async def answer(self, ask: str):
+        pass
+
+    @abstractmethod
+    async def _create_agents_with_strategy(self, history: list[dict]) -> dict:
+        pass
+
+    async def _update_conversation(self, conversation: dict, ask: str, answer: str):
+        await self.conversation_manager.update_conversation(conversation, ask, answer)
+
+
+class RequestResponseOrchestrator(BaseOrchestrator):
+    async def answer(self, ask: str) -> dict:
+        start_time = time.time()
+        conversation = await self.conversation_manager.get_or_create_conversation()
+        history = conversation.get("history", [])
+        agent_configuration = await self._create_agents_with_strategy(history)
+        answer_dict = await self._initiate_group_chat(agent_configuration, ask)
+        await self._update_conversation(conversation, ask, answer_dict['answer'])
+        response_time = time.time() - start_time
+        logging.info(f"[orchestrator] {self.short_id} Generated response in {response_time:.3f} sec.")
+        return answer_dict
+
+    async def _initiate_group_chat(self, agent_configuration: dict, ask: str) -> dict:
+        try:
+            logging.info(f"[orchestrator] {self.short_id} Creating group chat via SelectorGroupChat.")
+            group_chat = SelectorGroupChat(
+                participants=agent_configuration["agents"],
+                model_client=agent_configuration["model_client"],
+                termination_condition=agent_configuration["termination_condition"],
+                selector_func=agent_configuration["selector_func"],
+            )
+            result = await group_chat.run(task=ask)
+
+            # Parse the last message for answer and reasoning.
+            reasoning = ""
+            last_message = result.messages[-1].content if result.messages else '{"answer":"No answer provided."}'
+            try:
+                if isinstance(last_message, list):
+                    message_data = last_message
+                elif isinstance(last_message, (str, bytes, bytearray)):
+                    message_data = json.loads(last_message)
+                else:
+                    raise TypeError(f"Unexpected message type: {type(last_message)}")
+                answer = message_data.get("answer", "Oops! The agent team did not generate a response for the user.")
+                reasoning = message_data.get("reasoning", "")
+            except json.JSONDecodeError:
+                answer = "Oops! The agent team did not generate a response for the user."
+                logging.warning(f"[orchestrator] {self.short_id} Error: Malformed JSON. Using default values for answer and reasoning.")
+
+            if answer.endswith(agent_configuration['terminate_message']):
+                answer = answer[:-len(agent_configuration['terminate_message'])].strip()
+
+            chat_log = ChatLogParser.get_chat_log(result.messages)
+            data_points = ChatLogParser.extract_data_points(chat_log)
+
+            answer_dict = {
+                "conversation_id": self.conversation_id,
+                "answer": answer,
+                "reasoning": reasoning,
+                "thoughts": chat_log,
+                "data_points": data_points
+            }
+            return answer_dict
+
+        except Exception as e:
+            logging.error(f"[orchestrator] {self.short_id} An error occurred: {str(e)}", exc_info=True)
+            return {
+                "conversation_id": self.conversation_id,
+                "answer": f"We encountered an issue processing your request. Please try again later. Error: {str(e)}",
+                "reasoning": "",
+                "thoughts": [],
+                "data_points": []
+            }
+
+    async def _create_agents_with_strategy(self, history: list[dict]) -> dict:
+        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy.")
+        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token, OutputMode.REQUEST_RESPONSE, OutputFormat.JSON)
+
+
+class StreamingOrchestrator(BaseOrchestrator):
+    def __init__(
+        self,
+        conversation_id: str,
+        config: OrchestratorConfig,
+        client_principal: dict = None,
+        access_token: str = None,
+        agent_strategy=None
+    ):
+        super().__init__(conversation_id, config, client_principal, access_token, agent_strategy)
+        self.optimize_for_audio = False
+
+    def set_optimize_for_audio(self, optimize_for_audio: bool):
+        self.optimize_for_audio = optimize_for_audio
+
+    async def answer(self, ask: str):
+        conversation = await self.conversation_manager.get_or_create_conversation()
+        history = conversation.get("history", [])
+        agent_config = await self._create_agents_with_strategy(history)
+        group_chat = SelectorGroupChat(
+            participants=agent_config["agents"],
+            model_client=agent_config["model_client"],
+            termination_condition=agent_config["termination_condition"],
+            selector_func=agent_config["selector_func"],
+        )
+        stream = group_chat.run_stream(task=ask)
+        streamed_conversation_id = False
+        final_answer = ""
+        async for response in stream:
+            msg_str = str(response)
+            try:
+                msg = MessageParser.parse_message(msg_str)
+            except Exception as e:
+                logging.debug(f"Exception while parsing message: {e}")
+                continue
+            msg_type = msg.get("type", "")
+            msg_content = msg.get("content", "")
+            if msg_type == 'ModelClientStreamingChunkEvent':
+
+                # stream conversation_id in the first chunk
+                if not streamed_conversation_id:
+                    yield f"{conversation['id']} "
+                    streamed_conversation_id = True
+                
+                yield msg_content
+                logging.error(f"yielding chunk: {msg_content}")
+                final_answer += msg_content
+        await self._update_conversation(conversation, ask, final_answer)
+
+    async def _create_agents_with_strategy(self, history: list[dict]) -> dict:
+        output_format = OutputFormat.TEXT_TTS if self.optimize_for_audio else OutputFormat.TEXT
+        logging.info(f"[orchestrator] {self.short_id} Creating agents using {self.agent_strategy.strategy_type} strategy. In Streaming mode and {output_format} output format.")        
+        return await self.agent_strategy.create_agents(history, self.client_principal, self.access_token, OutputMode.STREAMING, output_format)
