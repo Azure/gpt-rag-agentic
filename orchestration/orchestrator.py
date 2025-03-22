@@ -293,25 +293,31 @@ class StreamingOrchestrator(BaseOrchestrator):
         stream = group_chat.run_stream(task=ask)
         streamed_conversation_id = False
         final_answer = ""
-        async for response in stream:
-            msg_str = str(response)
-            try:
-                msg = MessageParser.parse_message(msg_str)
-            except Exception as e:
-                logging.debug(f"Exception while parsing message: {e}")
-                continue
-            msg_type = msg.get("type", "")
-            msg_content = msg.get("content", "")
-            if msg_type == 'ModelClientStreamingChunkEvent':
+        try:
+            async for response in stream:
+                msg_str = str(response)
+                try:
+                    msg = MessageParser.parse_message(msg_str)
+                except Exception as e:
+                    logging.debug(f"Exception while parsing message: {e}")
+                    continue
+                msg_type = msg.get("type", "")
+                msg_content = msg.get("content", "")
+                if msg_type == 'ModelClientStreamingChunkEvent':
+                    # stream conversation_id in the first chunk
+                    if not streamed_conversation_id:
+                        yield f"{conversation['id']} "
+                        streamed_conversation_id = True
 
-                # stream conversation_id in the first chunk
-                if not streamed_conversation_id:
-                    yield f"{conversation['id']} "
-                    streamed_conversation_id = True
-                
-                yield msg_content
-                logging.error(f"yielding chunk: {msg_content}")
-                final_answer += msg_content
+                    yield msg_content
+                    logging.info(f"Yielding chunk: {msg_content}")
+                    final_answer += msg_content
+        except Exception as error:
+            logging.error(f"Error in streaming response: {error}", exc_info=True)
+            error_message = f"\nWe encountered an issue processing your request. Please contact our support team for assistance. \n\n *{error}*"
+            yield error_message
+            final_answer += error_message
+
         await self._update_conversation(conversation, ask, final_answer)
 
     async def _create_agents_with_strategy(self, history: list[dict]) -> dict:
