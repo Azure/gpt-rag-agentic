@@ -9,7 +9,8 @@ from autogen_agentchat.messages import TextMessage
 from tools import ExecuteQueryResult
 
 from .base_agent_strategy import BaseAgentStrategy
-from ..constants import CHAT_WITH_FABRIC
+from ..constants import Strategy
+
 from tools import (
     get_time,
     get_today_date,
@@ -48,10 +49,14 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
     def __init__(self):
         # Initialize the strategy type
         super().__init__()
-        self.strategy_type = CHAT_WITH_FABRIC
+        self.strategy_type = Strategy.CHAT_WITH_FABRIC
 
-    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
+    async def create_agents(self, history, client_principal=None, access_token=None, text_only=False, optimize_for_audio=False):
         
+        # Response configuration
+        self.text_only=text_only
+        self.optimize_for_audio=optimize_for_audio    
+
         # Model Context
         shared_context = await self._get_model_context(history)  
 
@@ -196,4 +201,4 @@ class ChatWithFabricStrategy(BaseAgentStrategy):
         self.agents = [triage_agent, dax_query_agent, sql_query_agent, chat_closure]
         # self.agents = [triage_agent, query_agents, chat_closure]
 
-        return self._get_agent_configuration()
+        return self._get_agents_configuration()

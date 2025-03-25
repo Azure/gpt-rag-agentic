@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from autogen_agentchat.agents import AssistantAgent
 from autogen_core.tools import FunctionTool
 from .nl2sql_base_agent_strategy import NL2SQLBaseStrategy
-from ..constants import NL2SQL_FEWSHOT
+from ..constants import Strategy
 from tools import (
     get_time,
     get_today_date,
@@ -15,30 +15,20 @@ from tools import (
     execute_sql_query,
 )
 
-
-## Group Chat Response Format
-
-class ChatGroupResponse(BaseModel):
-    answer: str
-    reasoning: str
-
-class ChatGroupTextOnlyResponse(BaseModel):
-    answer: str
-
 # Agents Strategy Class
 
 class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
 
     def __init__(self):
-        self.strategy_type = NL2SQL_FEWSHOT
+        self.strategy_type = Strategy.NL2SQL_FEWSHOT
         super().__init__()
 
         
-    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
+    async def create_agents(self, history, client_principal=None, access_token=None, output_mode=None, output_format=None):
         """
         Creates agents and registers functions for the NL2SQL single agent scenario.
         """
-        
+
         # Model Context
         shared_context = await self._get_model_context(history) 
         
@@ -82,17 +72,7 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
         )
 
         ## Chat Closure Agent
-        if optimize_for_audio:
-            prompt_name = "chat_closure_audio"
-            chat_group_response_type = ChatGroupTextOnlyResponse
-        else:
-            prompt_name = "chat_closure"
-            chat_group_response_type = ChatGroupResponse
-        chat_closure = AssistantAgent(
-            name="chat_closure",
-            system_message=await self._read_prompt(prompt_name),
-            model_client=self._get_model_client(response_format=chat_group_response_type)
-        )
+        chat_closure = await self._create_chat_closure_agent(output_format, output_mode)
         
         # Group Chat Configuration
 
@@ -116,4 +96,4 @@ class NL2SQLFewshotStrategy(NL2SQLBaseStrategy):
 
         self.agents = [assistant, chat_closure]
         
-        return self._get_agent_configuration()
+        return self._get_agents_configuration()

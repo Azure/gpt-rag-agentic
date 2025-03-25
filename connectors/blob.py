@@ -14,7 +14,7 @@ class BlobClient:
         :param blob_url: URL of the blob (e.g., "https://mystorage.blob.core.windows.net/mycontainer/myblob.png")
         :param credential: Credential for authentication (optional)
         """
-        # 1. Generate the credential in case it is not provided 
+        # 1. Generate the credential in case it is not provided
         self.credential = self._get_credential(credential)
         self.file_url = blob_url
         self.blob_service_client = None
@@ -74,7 +74,6 @@ class BlobClient:
             Exception: If downloading the blob fails after retries.
         """
         blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=self.blob_name)
-        blob_error = None
         data = b""
 
         try:
@@ -82,18 +81,8 @@ class BlobClient:
             data = blob_client.download_blob().readall()
             logging.info(f"[blob][{self.blob_name}] Blob downloaded successfully.")
         except Exception as e:
-            logging.warning(f"[blob][{self.blob_name}] Connection error, retrying in 10 seconds... Error: {e}")
-            time.sleep(10)
-            try:
-                data = blob_client.download_blob().readall()
-                logging.info(f"[blob][{self.blob_name}] Blob downloaded successfully on retry.")
-            except Exception as e_retry:
-                blob_error = e_retry
-                logging.error(f"[blob][{self.blob_name}] Failed to download blob after retry: {blob_error}")
-
-        if blob_error:
-            error_message = f"Blob client error when reading from blob storage: {blob_error}"
-            logging.error(f"[blob][{self.blob_name}] {error_message}")
+            error_message = f"Error when downloading blob: {e}"            
+            logging.error(f"[blob][{self.blob_name}] Failed to download blob. Error: {e}")
             raise Exception(error_message)
 
         return data
