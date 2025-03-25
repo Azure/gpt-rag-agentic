@@ -7,20 +7,20 @@ from .strategies.nl2sql_fewshot_strategy import NL2SQLFewshotStrategy
 # Other Strategies
 from .strategies.chat_with_fabric_strategy import ChatWithFabricStrategy
 
-from .constants import CLASSIC_RAG, MULTIMODAL_RAG, NL2SQL, NL2SQL_FEWSHOT, CHAT_WITH_FABRIC
+from .constants import Strategy
 
 class AgentStrategyFactory:
     @staticmethod
-    def get_strategy(strategy_type: str):
-        if strategy_type == CLASSIC_RAG:
+    def get_strategy(strategy_type: Strategy):
+        if strategy_type == Strategy.CLASSIC_RAG:
             return ClassicRAGAgentStrategy()
-        elif strategy_type == MULTIMODAL_RAG:
+        elif strategy_type == Strategy.MULTIMODAL_RAG:
             return MultimodalAgentStrategy()        
-        elif strategy_type == CHAT_WITH_FABRIC:
+        elif strategy_type == Strategy.CHAT_WITH_FABRIC:
             return ChatWithFabricStrategy()    
-        elif strategy_type == NL2SQL:
+        elif strategy_type == Strategy.NL2SQL:
             return NL2SQLStandardStrategy()
-        elif strategy_type == NL2SQL_FEWSHOT:
+        elif strategy_type == Strategy.NL2SQL_FEWSHOT:
             return NL2SQLFewshotStrategy() 
            
         # Add other strategies here as needed.
@@ -29,4 +29,4 @@ class AgentStrategyFactory:
         #     return CustomAgentStrategy()
         
         else:
-            raise ValueError(f"Unknown strategy type: {strategy_type}")
+            raise ValueError(f"Unknown strategy type: {strategy_type.value}")

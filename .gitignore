@@ -4,6 +4,7 @@ __blobstorage__/
 *.py[cod]
 *$py.class
 local/
+.local/
 local.settings.json
 __*/*
 *.custom.txt

@@ -8,6 +8,14 @@ from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
 from autogen_core.model_context import BufferedChatCompletionContext
 from autogen_core.models import SystemMessage
+from pydantic import BaseModel
+from ..constants import OutputFormat, OutputMode
+from autogen_agentchat.agents import AssistantAgent
+
+# Agent response types
+class ChatGroupResponse(BaseModel):
+    answer: str
+    reasoning: str
 
 class BaseAgentStrategy:
     def __init__(self):
@@ -24,9 +32,11 @@ class BaseAgentStrategy:
         self.terminate_message = "TERMINATE"
         self.max_rounds = int(os.getenv('MAX_ROUNDS', 8))
         self.selector_func = None
-        self.context_buffer_size = int(os.getenv('CONTEXT_BUFFER_SIZE', 30))      
+        self.context_buffer_size = int(os.getenv('CONTEXT_BUFFER_SIZE', 30))
+        self.text_only=False 
+        self.optimize_for_audio=False
 
-    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False): 
+    async def create_agents(self, history, client_principal=None, access_token=None, text_only=False, optimize_for_audio=False): 
         """
         Create agent instances for the strategy.
 
@@ -42,7 +52,7 @@ class BaseAgentStrategy:
         """
         raise NotImplementedError("This method should be overridden in subclasses.")
 
-    def _get_agent_configuration(self):
+    def _get_agents_configuration(self):
         """
         Retrieve the configuration for agents managed by this strategy.
 
@@ -152,71 +162,57 @@ class BaseAgentStrategy:
             security_ids = f"{client_principal['id']}" + (f",{group_names}" if group_names else "")
         return security_ids
 
-    async def _read_prompt(self, agent_name, placeholders=None):
+    async def _read_prompt(self, prompt_name, placeholders=None):
         """
-        Reads the prompt file for a given agent, checking for custom or default files.
+        Load and process a prompt file, applying strategy-based variants and placeholder replacements.
 
-        The method searches for prompt files within the `prompts` directory. 
-        It first looks for a custom prompt file and falls back to a default prompt 
-        if the custom file does not exist.
+        This method reads a prompt file associated with a given agent, supporting optional variants
+        (e.g., audio-optimized or text-only) and dynamic placeholder substitution.
 
-        **Prompt Directory Location**:
-        - The base prompt directory is named `prompts`. If the strategy has a 
-        `strategy_type`, the prompt files are located in a subdirectory named 
-        after that strategy (e.g., `prompts/strategy_name`).
+        **Prompt Directory Structure**:
+        - Prompts are stored in the `prompts/` directory.
+        - If a strategy type is defined (`self.strategy_type`), the file is expected in a subdirectory:
+          `prompts/<strategy_type>/`.
 
-        **Prompt File Naming**:
-        - Custom prompt file: `{agent_name}.custom.txt`
-        - Default prompt file: `{agent_name}.txt`
+        **Prompt File Naming Convention**:
+        - The filename is based on the provided `prompt_name`: `<prompt_name>.txt`.
+        - You can pre-define variants externally using names like `<prompt_name>_audio.txt` or 
+          `<prompt_name>_text_only.txt`, but this method does not automatically append suffixes. 
+          Suffix logic must be handled when building `prompt_name`.
 
-        **Prompt Lookup**:
-        - If `{agent_name}.custom.txt` exists, it is read.
-        - If not, `{agent_name}.txt` is read.
-        - If neither file exists, a `FileNotFoundError` is raised.
+        **Placeholder Substitution**:
+        - If a `placeholders` dictionary is provided, placeholders in the format `{{key}}` are replaced by
+          their corresponding values.
+        - If any `{{key}}` remains after substitution, the method checks for a fallback file:
+          `prompts/common/<key>.txt`. If found, its content replaces the placeholder.
+        - If no replacement is available, a warning is logged.
 
-        **Placeholder Replacement**:
-        - If `placeholders` are provided, any placeholder in the prompt following 
-        the format `{{placeholder_name}}` will be replaced with the corresponding 
-        value from `placeholders`.
-        - For any remaining placeholders not replaced (i.e., not in `placeholders`), 
-        the method will search for a file named `placeholder_name.txt` in the 
-        `prompts/common` directory. If the file exists, the placeholder will be replaced 
-        with the content of that file.
+        **Example**:
+        For `prompt_name='agent1_audio'` and `self.strategy_type='customer_service'`, the file path would be:
+        `prompts/customer_service/agent1_audio.txt`
 
-        **Examples**:
-        For an agent named `agent1` and a strategy type `customer_service`, the 
-        following files are searched:
-        1. `prompts/customer_service/agent1.custom.txt`
-        2. `prompts/customer_service/agent1.txt`
-        
-        Parameters:
-        - agent_name (str): The name of the agent for which the prompt is being read.
-        - placeholders (dict, optional): A dictionary of placeholder names and 
-        their corresponding values to replace in the prompt.
+        **Parameters**:
+        - prompt_name (str): The base name of the prompt file (without path, but may include variant suffix).
+        - placeholders (dict, optional): Mapping of placeholder names to their substitution values.
 
-        Returns:
-        - str: The content of the prompt file with placeholders replaced if applicable.
+        **Returns**:
+        - str: Final content of the prompt with placeholders replaced.
 
-        Raises:
-        - FileNotFoundError: If neither a custom nor a default prompt file is found.
-        """        
-        # Define the custom and default file paths
-        custom_file_path = os.path.join(self._prompt_dir(), f"{agent_name}.custom.txt")
-        default_file_path = os.path.join(self._prompt_dir(), f"{agent_name}.txt")
-                                 
-        # Check for the custom prompt file first
-        if os.path.exists(custom_file_path):
-            selected_file = custom_file_path
-            logging.info(f"[base_agent_strategy] Using custom file path: {custom_file_path}")            
-        elif os.path.exists(default_file_path):
-            selected_file = default_file_path
-            logging.info(f"[base_agent_strategy] Using default file path: {default_file_path}")                  
-        else:
-            logging.error(f"[base_agent_strategy] Prompt file for agent '{agent_name}' not found.")
-            raise FileNotFoundError(f"Prompt file for agent '{agent_name}' not found.")
+        **Raises**:
+        - FileNotFoundError: If the specified prompt file does not exist.
+        """
+ 
+        # Construct the prompt file path
+        prompt_file_path = os.path.join(self._prompt_dir(), f"{prompt_name}.txt")
+
+        if not os.path.exists(prompt_file_path):
+            logging.error(f"[base_agent_strategy] Prompt file '{prompt_name}' not found: {prompt_file_path}.")
+            raise FileNotFoundError(f"Prompt file '{prompt_name}' not found.")
+
+        logging.info(f"[base_agent_strategy] Using prompt file path: {prompt_file_path}")
         
         # Read and process the selected prompt file
-        with open(selected_file, "r") as f:
+        with open(prompt_file_path, "r") as f:
             prompt = f.read().strip()
             
             # Replace placeholders provided in the 'placeholders' dictionary
@@ -245,6 +241,8 @@ class BaseAgentStrategy:
                         f"[base_agent_strategy] Placeholder '{{{{{placeholder_name}}}}}' could not be replaced."
                     )
             return prompt
+
+
         
 
     def _prompt_dir(self):
@@ -259,7 +257,7 @@ class BaseAgentStrategy:
             """
             if not hasattr(self, 'strategy_type'):
                 raise ValueError("strategy_type is not defined")        
-            prompts_dir = "prompts" + "/" + self.strategy_type
+            prompts_dir = "prompts" + "/" + self.strategy_type.value
             return prompts_dir
 
     async def _get_model_context(self, history):
@@ -270,3 +268,35 @@ class BaseAgentStrategy:
         initial_messages = []
         initial_messages.append(SystemMessage(content=f"Summary of Conversation History to Assist with Follow-Up Questions: {history_summary}"))
         return BufferedChatCompletionContext(buffer_size=self.context_buffer_size, initial_messages=initial_messages)
+    
+
+    async def _create_chat_closure_agent(self, output_format, output_mode):
+        """
+        Create a chat closure agent based on the specified output format and mode.
+
+        Parameters:
+            output_format (OutputFormat): The desired output format (e.g., TEXT_TTS, JSON, TEXT).
+            output_mode (OutputMode): The desired output mode (e.g., STREAMING or non-streaming).
+
+        Returns:
+            AssistantAgent: The configured chat closure agent.
+
+        Raises:
+            ValueError: If output_format or output_mode is None.
+        """
+        if output_format is None or output_mode is None:
+            raise ValueError("Both output_format and output_mode must be specified.")
+
+        if output_format == OutputFormat.TEXT_TTS:
+            prompt_name = "chat_closure_tts"
+        elif output_format == OutputFormat.JSON:
+            prompt_name = "chat_closure_json"
+        elif output_format == OutputFormat.TEXT:
+            prompt_name = "chat_closure_text"
+
+        return AssistantAgent(
+            name="chat_closure",
+            system_message=await self._read_prompt(prompt_name),
+            model_client=self._get_model_client() if output_mode == OutputMode.STREAMING else self._get_model_client(response_format=ChatGroupResponse),
+            model_client_stream=True if output_mode == OutputMode.STREAMING else False
+        )

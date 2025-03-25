@@ -115,7 +115,7 @@ Define custom agent strategies by specifying distinctive agent behaviors. To cre
 
    class AgentStrategyFactory:
        @staticmethod
-       def get_strategy(strategy_type: str):
+       def get_strategy(strategy_type: Strategy):
            # Existing strategy selections
            if strategy_type == 'custom':
                return CustomAgentStrategy()

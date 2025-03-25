@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from typing import Sequence, Annotated
+from typing import Annotated, Sequence
 
 from pydantic import BaseModel
 
@@ -15,22 +15,14 @@ from autogen_agentchat.messages import (
     ToolCallSummaryMessage,
 )
 from autogen_core import CancellationToken, Image
+from autogen_core.model_context import BufferedChatCompletionContext
 from autogen_core.tools import FunctionTool
 from connectors import BlobClient
-from tools import get_time, get_today_date
-from tools import multimodal_vector_index_retrieve
+from tools import get_time, get_today_date, multimodal_vector_index_retrieve
 from tools.ragindex.types import MultimodalVectorIndexRetrievalResult
-from autogen_core.model_context import BufferedChatCompletionContext
 
+from ..constants import Strategy
 from .base_agent_strategy import BaseAgentStrategy
-from ..constants import MULTIMODAL_RAG
-
-class ChatGroupResponse(BaseModel):
-    answer: str
-    reasoning: str
-
-class ChatGroupTextOnlyResponse(BaseModel):
-    answer: str
 
 class MultimodalMessageCreator(BaseChatAgent):
     """
@@ -146,9 +138,9 @@ class MultimodalMessageCreator(BaseChatAgent):
 class MultimodalAgentStrategy(BaseAgentStrategy):
     def __init__(self):
         super().__init__()
-        self.strategy_type = MULTIMODAL_RAG
+        self.strategy_type = Strategy.MULTIMODAL_RAG
 
-    async def create_agents(self, history, client_principal=None, access_token=None, optimize_for_audio=False):
+    async def create_agents(self, history, client_principal=None, access_token=None, output_mode=None, output_format=None):
         """
         Multimodal RAG creation strategy that creates the basic agents and registers functions.
         
@@ -201,20 +193,10 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
             model_client=self._get_model_client(),
             reflect_on_tool_use=True
         )
-
-        ## Chat Closure Agent
-        if optimize_for_audio:
-            prompt_name = "chat_closure_audio"
-            chat_group_response_type = ChatGroupTextOnlyResponse
-        else:
-            prompt_name = "chat_closure"
-            chat_group_response_type = ChatGroupResponse
-        chat_closure = AssistantAgent(
-            name="chat_closure",
-            system_message=await self._read_prompt(prompt_name),
-            model_client=self._get_model_client(response_format=chat_group_response_type)
-        )
         
+        ## Chat Closure Agent
+        chat_closure = await self._create_chat_closure_agent(output_format, output_mode)
+
         # Agent Configuration
 
         # Optional: Override the termination condition for the assistant. Set None to disable each termination condition.
@@ -246,4 +228,4 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
 
         self.agents = [triage_agent, multimodal_creator, main_assistant, chat_closure]
         
-        return self._get_agent_configuration()
+        return self._get_agents_configuration()
