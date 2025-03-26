@@ -290,7 +290,8 @@ async def multimodal_vector_index_retrieve(
             # Replace image filenames with URLs.
             content = replace_image_filenames_with_urls(content, doc.get('relatedImages', []))
             # Extract image URLs from content using regex.
-            doc_image_urls = re.findall(r'<figure>(https?://\S+)</figure>', content)
+            # doc_image_urls = re.findall(r'<figure>(https?://\S+)</figure>', content)
+            doc_image_urls = re.findall(r'<figure>(https?://.*?)</figure>', content)
             image_urls.append(doc_image_urls)
             # Replace <figure>...</figure> with <img src="...">
             content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)
