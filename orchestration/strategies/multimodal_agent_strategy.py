@@ -215,13 +215,23 @@ class MultimodalAgentStrategy(BaseAgentStrategy):
             """            
             last_msg = messages[-1]
             if last_msg.source == "user":
-                return "triage_agent"
+                selected_agent = "triage_agent"
+                logging.info(f"[multimodal_agent_strategy] selected {selected_agent} agent")
+                return selected_agent
             if last_msg.source == "triage_agent" and isinstance(last_msg, ToolCallSummaryMessage):
-                return "multimodal_creator"
+                selected_agent = "multimodal_creator"
+                logging.info(f"[multimodal_agent_strategy] selected {selected_agent} agent")
+                return selected_agent                
             if last_msg.source == "multimodal_creator":
-                return "main_assistant" 
+                selected_agent = "main_assistant"
+                logging.info(f"[multimodal_agent_strategy] selected {selected_agent} agent")
+                return selected_agent             
             if last_msg.source in ["main_assistant", "triage_agent"]:
-                return "chat_closure"                 
+                selected_agent = "chat_closure"
+                logging.info(f"[multimodal_agent_strategy] selected {selected_agent} agent")
+                return selected_agent                             
+            selected_agent = "None"
+            logging.info(f"[multimodal_agent_strategy] selected {selected_agent}")            
             return None
         
         self.selector_func = custom_selector_func

@@ -310,7 +310,7 @@ class StreamingOrchestrator(BaseOrchestrator):
                         streamed_conversation_id = True
 
                     yield msg_content
-                    logging.info(f"Yielding chunk: {msg_content}")
+                    # logging.info(f"Yielding chunk: {msg_content}")
                     final_answer += msg_content
         except Exception as error:
             logging.error(f"Error in streaming response: {error}", exc_info=True)

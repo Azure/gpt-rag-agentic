@@ -12,9 +12,19 @@ from orchestration import RequestResponseOrchestrator, StreamingOrchestrator, Or
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)        
 logging.getLogger('azure').setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+logging.getLogger("autogen_core").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("openai._base_client").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+if os.environ.get("AUTOGEN_DETAILED_LOG", "").lower() in ("true", "1"):
+    logging.getLogger("autogen_core.events").setLevel(logging.WARNING)
 logging.basicConfig(level=os.environ.get('LOGLEVEL', 'DEBUG').upper(), force=True)
 logging.getLogger("uvicorn.error").propagate = True
 logging.getLogger("uvicorn.access").propagate = True
+
 
 # Create the Function App with the desired auth level.
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
@@ -74,7 +84,7 @@ async def orchestrator_streaming(req: Request) -> StreamingResponse:
                     yield "\n\n"
                     last_yield = now
                 if chunk:
-                    logging.info(f"Yielding chunk: {chunk}")
+                    # logging.info(f"Yielding chunk: {chunk}")
                     # For text-only mode, yield the raw chunk; else, serialize to JSON.
                     yield chunk
                     last_yield = now
