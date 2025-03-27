@@ -19,7 +19,7 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("openai._base_client").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
-if os.environ.get("AUTOGEN_DETAILED_LOG", "").lower() in ("true", "1"):
+if os.environ.get("AUTOGEN_EVENTS_LOG", "").lower() in ("true", "1"):
     logging.getLogger("autogen_core.events").setLevel(logging.WARNING)
 logging.basicConfig(level=os.environ.get('LOGLEVEL', 'DEBUG').upper(), force=True)
 logging.getLogger("uvicorn.error").propagate = True

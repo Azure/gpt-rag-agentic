@@ -20,6 +20,7 @@ from autogen_core.tools import FunctionTool
 from connectors import BlobClient
 from tools import get_time, get_today_date, multimodal_vector_index_retrieve
 from tools.ragindex.types import MultimodalVectorIndexRetrievalResult
+from urllib.parse import urlparse
 
 from ..constants import Strategy
 from .base_agent_strategy import BaseAgentStrategy
@@ -109,9 +110,15 @@ class MultimodalMessageCreator(BaseChatAgent):
                     
                     # Open the image using PIL
                     base64_str = base64.b64encode(blob_data).decode('utf-8')
+
+                    # Open the image using PIL
                     pil_img = Image.from_base64(base64_str)
-                    logging.debug(f"[multimodal_agent_strategy] Opened image from URL: {url}")
                     
+                    parsed_url = urlparse(url)
+                    pil_img.url = parsed_url.path
+
+                    logging.debug(f"[multimodal_agent_strategy] Opened image from URL: {url}")
+    
                     # Append the PIL Image object to your list (modify as needed)
                     image_objects.append(pil_img)
                     image_count += 1  # Increment the counter

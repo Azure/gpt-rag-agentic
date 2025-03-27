@@ -151,12 +151,14 @@ async def vector_index_retrieve(
         elapsed = round(time.time() - start_time, 2)
         logging.info(f"[vector_index_retrieve] Finished querying Azure Cognitive Search in {elapsed} seconds")
 
+        url = doc.get('url', '')
+        url = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
+
         if response_json.get('value'):
             logging.info(f"[vector_index_retrieve] {len(response_json['value'])} documents retrieved")
             for doc in response_json['value']:
                 content_str = doc.get('content', '').strip()
-                filepath_str = doc.get('filepath', '')
-                search_results.append(f"{filepath_str}: {content_str}\n")
+                search_results.append(f"{url}: {content_str}\n")
         else:
             logging.info("[vector_index_retrieve] No documents retrieved")
 
@@ -238,7 +240,7 @@ async def multimodal_vector_index_retrieve(
 
     # 3. Build the request body.
     body: Dict[str, Any] = {
-        "select": "title, content, filepath, relatedImages",
+        "select": "title, content, filepath, url, relatedImages",
         "top": search_top_k,
         "vectorQueries": [
             {
@@ -286,16 +288,28 @@ async def multimodal_vector_index_retrieve(
         logging.info(f"[multimodal_vector_index_retrieve] Finished querying Azure AI Search in {response_time} seconds")
 
         for doc in response_json.get('value', []):
+            
             content = doc.get('content', '')
-            # Replace image filenames with URLs.
+            url = doc.get('url', '')
+
+            # Convert blob URL to relative path
+            url = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
+            text_results.append(f"{url}: {content.strip()}")
+
+            # Replace image filenames with URLs
             content = replace_image_filenames_with_urls(content, doc.get('relatedImages', []))
-            # Extract image URLs from content using regex.
-            # doc_image_urls = re.findall(r'<figure>(https?://\S+)</figure>', content)
+
+            # Extract image URLs from <figure> tags
             doc_image_urls = re.findall(r'<figure>(https?://.*?)</figure>', content)
+            # doc_image_urls = [
+            #     re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', img_url)
+            #     for img_url in doc_image_urls
+            # ]
             image_urls.append(doc_image_urls)
+
             # Replace <figure>...</figure> with <img src="...">
             content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)
-            text_results.append(f"{doc.get('filepath', '')}: {content.strip()}")
+
     except Exception as e:
         error_message = f"Exception in retrieval: {e}"
         logging.error(f"[multimodal_vector_index_retrieve] {error_message}", exc_info=True)
