@@ -20,12 +20,10 @@ class OrchestratorConfig:
         self,
         conversation_container: str = None,
         storage_account: str = None,
-        documents_container: str = None,
         orchestration_strategy: Strategy = None,
     ):
         self.conversation_container = conversation_container or os.environ.get('CONVERSATION_CONTAINER', 'conversations')
         self.storage_account = storage_account or os.environ.get('AZURE_STORAGE_ACCOUNT', 'your_storage_account')
-        self.documents_container = documents_container or os.environ.get('AZURE_STORAGE_CONTAINER', 'documents')
         strategy_from_env = os.getenv('AUTOGEN_ORCHESTRATION_STRATEGY', 'classic_rag').replace('-', '_')
         self.orchestration_strategy = (orchestration_strategy or Strategy(strategy_from_env))
 
@@ -310,7 +308,7 @@ class StreamingOrchestrator(BaseOrchestrator):
                         streamed_conversation_id = True
 
                     yield msg_content
-                    logging.info(f"Yielding chunk: {msg_content}")
+                    # logging.info(f"Yielding chunk: {msg_content}")
                     final_answer += msg_content
         except Exception as error:
             logging.error(f"Error in streaming response: {error}", exc_info=True)
