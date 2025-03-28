@@ -186,7 +186,6 @@ These variables must be configured directly in Function App Service as **Applica
 | `FUNCTIONS_EXTENSION_VERSION`        | `~4` | Specifies the Azure Functions runtime version. |
 | `FUNCTIONS_WORKER_RUNTIME`           | `python` | Azure Functions worker runtime. |
 
-
 ### Cloud Deployment
 
 There are two main options for deploying the orchestrator to the cloud:
