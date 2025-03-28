@@ -140,9 +140,9 @@ Below are the three deliverables you requested. We’ve kept only the non‐opti
 
 ### Environment Variables
 
-To successfully run the orchestrator Function App, you must configure the following environment variables. These variables should be defined locally using the `.env` file (following the structure from `.env.template`) and in production environments, such as Azure App Service, via the `app_settings.json` file or Application Settings.
+To successfully run the orchestrator Function App, you must configure the following environment variables. These variables should be defined locally using the `.env` file (following the structure from `.env.template`) and in cloud environments, such as Azure Function App, via the `app_settings.json` file in the Application Settings section.
 
-#### Required Environment Variables
+#### App Environment Variables
 
 | **Variable**                         | **Description** |
 |--------------------------------------|-----------------|
@@ -170,9 +170,9 @@ To successfully run the orchestrator Function App, you must configure the follow
 | `PYTHON_ENABLE_INIT_INDEXING`        | `1` | Enables initial Python indexing. |
 | `PYTHON_ISOLATE_WORKER_DEPENDENCIES` | `1` | Isolates Python worker dependencies. |
 
-#### Azure App Service Specific Settings
+#### Azure Function App Specific Settings
 
-These variables must be configured directly in Azure App Service as **Application Settings**, and do not need to be included in your local `.env` file. The recommended values are provided below.
+These variables must be configured directly in Function App Service as **Application Settings**, and do not need to be included in your local `.env` file. The recommended values are provided below.
 
 | **Variable**                         | **Recommended Value** | **Description** |
 |--------------------------------------|----------------------|-----------------|
