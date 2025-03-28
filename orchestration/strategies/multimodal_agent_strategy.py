@@ -1,7 +1,9 @@
 import base64
 import json
 import logging
+import re
 from typing import Annotated, Sequence
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
@@ -18,9 +20,12 @@ from autogen_core import CancellationToken, Image
 from autogen_core.model_context import BufferedChatCompletionContext
 from autogen_core.tools import FunctionTool
 from connectors import BlobClient
-from tools import get_time, get_today_date, multimodal_vector_index_retrieve
+from tools import (
+    get_time,
+    get_today_date,
+    multimodal_vector_index_retrieve,
+)
 from tools.ragindex.types import MultimodalVectorIndexRetrievalResult
-from urllib.parse import urlparse
 
 from ..constants import Strategy
 from .base_agent_strategy import BaseAgentStrategy
@@ -85,6 +90,8 @@ class MultimodalMessageCreator(BaseChatAgent):
         # Extract text and image data
         texts = retrieval_data.get("texts", [])
         image_urls = retrieval_data.get("images", [])
+        image_captions = retrieval_data.get("captions", [])        
+        image_captions = self.extract_image_caption_segments(image_captions)
 
         # Combine text snippets into a single string
         combined_text = self.system_prompt + "\n\n".join(texts) if texts else "No text results"
@@ -92,9 +99,11 @@ class MultimodalMessageCreator(BaseChatAgent):
         # Fetch images from URLs
         image_objects = []
         max_images = 50  # maximum number of images to process (Azure OpenaI GPT-4o limit)
-        image_count = 0    
+        image_count = 0
+        url_list_pos = 0
         for url_list in image_urls:  # Assuming each item in image_urls is a list of URLs
             for url in url_list:  # Iterate through each URL in the sublist
+                url_pos = 0
                 if image_count >= max_images:
                     logging.info(f"[multimodal_agent_strategy] Reached the maximum image limit of {max_images}. Stopping further downloads.")
                     break  # Stop processing more URLs                
@@ -115,7 +124,8 @@ class MultimodalMessageCreator(BaseChatAgent):
                     pil_img = Image.from_base64(base64_str)
                     
                     parsed_url = urlparse(url)
-                    pil_img.url = parsed_url.path
+                    pil_img.path = parsed_url.path
+                    pil_img.caption = image_captions[url_list_pos][url_pos] if url_list_pos < len(image_captions) and url_pos < len(image_captions[url_list_pos]) else None               
 
                     logging.debug(f"[multimodal_agent_strategy] Opened image from URL: {url}")
     
@@ -123,9 +133,11 @@ class MultimodalMessageCreator(BaseChatAgent):
                     image_objects.append(pil_img)
                     image_count += 1  # Increment the counter
                     logging.info(f"[multimodal_agent_strategy] Successfully loaded image from {url}")
+                    url_pos += 1
 
                 except Exception as e:
                     logging.error(f"[multimodal_agent_strategy] Could not load image from {url}: {e}")
+            url_list_pos += 1
 
 
         # Construct and return the MultiModalMessage response
@@ -134,6 +146,38 @@ class MultimodalMessageCreator(BaseChatAgent):
             source=self.name
         )
         return Response(chat_message=multimodal_msg)
+
+    def extract_image_caption_segments(self, image_captions):
+        """
+        Extracts caption segments from each string in image_captions.
+        
+        Each non-empty string in image_captions is expected to have one or more segments in the format:
+        [<filename-with-figure-info.png>]: <caption text>
+        
+        This function splits each string into a list of such segments. Empty strings are returned unchanged.
+        
+        Parameters:
+            image_captions (list of str): The list of caption strings to be processed.
+            
+        Returns:
+            list: A list where each non-empty element is a list of extracted caption segments, and empty strings remain empty.
+        """
+        # Define the regex pattern:
+        # - (\[[^]]+?\.png\]:.*?) matches a marker [ ...png]: followed by any text (non-greedy)
+        # - (?=\[[^]]+?\.png\]:|$) is a lookahead to stop at the next marker or at the end of the string.
+        pattern = r'(\[[^]]+?\.png\]:.*?)(?=\[[^]]+?\.png\]:|$)'
+        
+        new_image_captions = []
+        for caption in image_captions:
+            if caption.strip() == '':
+                # Keep empty strings as they are.
+                new_image_captions.append('')
+            else:
+                # Use DOTALL so that '.' matches newlines as well.
+                segments = re.findall(pattern, caption, flags=re.DOTALL)
+                new_image_captions.append(segments)
+        
+        return new_image_captions
 
     async def on_reset(self, cancellation_token: CancellationToken) -> None:
         """
