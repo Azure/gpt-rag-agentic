@@ -10,9 +10,10 @@ Part of [GPT-RAG](https://aka.ms/gpt-rag)
    - [1.3 NL2SQL and Chat with Fabric](docs/NL2SQL.md)   
    - [1.4 Create your Own Agent Strategy](#how-to-add-and-configure-you-own-agent-strategies)
 2. [**Running the Orchestrator**](#running-the-orchestrator)
-   - [2.1 Cloud Deployment](#cloud-deployment)
-   - [2.2 Running the Chat Client Locally](#running-the-chat-client-locally)
-   - [2.3 Running the Function Locally](docs/LOCAL_DEPLOYMENT.md)
+   - [2.1 Environment Variables](#environment-variables)
+   - [2.2 Cloud Deployment](#cloud-deployment)
+   - [2.3 Running the Chat Client Locally](#running-the-chat-client-locally)
+   - [2.4 Running the Function Locally](docs/LOCAL_DEPLOYMENT.md)
 3. [**Evaluation**](#evaluation)
 4. [**Contributing**](#contributing)
 5. [**Trademarks**](#trademarks)
@@ -132,6 +133,59 @@ Ensure the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly se
 ---
 
 ## Running the Orchestrator
+
+Below are the three deliverables you requested. We’ve kept only the non‐optional variables (except for BUILD_FLAGS and XDG_CACHE_HOME, which you want in app settings) and removed FUNCTION_KEY and AZURE_STORAGE_CONTAINER. The extra variables listed below are kept only in the app settings and not in the local .env file.
+
+---
+
+### Environment Variables
+
+To successfully run the orchestrator Function App, you must configure the following environment variables. These variables should be defined locally using the `.env` file (following the structure from `.env.template`) and in production environments, such as Azure App Service, via the `app_settings.json` file or Application Settings.
+
+#### Required Environment Variables
+
+| **Variable**                         | **Description** |
+|--------------------------------------|-----------------|
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Connection string for Application Insights (telemetry and monitoring). |
+| `AUTOGEN_ORCHESTRATION_STRATEGY`       | The agent orchestration strategy (e.g., `multimodal_rag`). |
+| `AZURE_DB_ID`                        | Cosmos DB account ID (used to construct the Cosmos DB endpoint). |
+| `AZURE_DB_NAME`                      | Name of the Cosmos DB database. |
+| `AZURE_KEY_VAULT_NAME`               | Name of your Azure Key Vault (used for secrets retrieval). |
+| `AZURE_OPENAI_API_KEY`               | API key for Azure OpenAI access. |
+| `AZURE_OPENAI_API_VERSION`           | API version for Azure OpenAI (recommended: `2024-10-21`). |
+| `AZURE_OPENAI_CHATGPT_DEPLOYMENT`    | Deployment name of the ChatGPT model (e.g., `chat`). |
+| `AZURE_OPENAI_CHATGPT_MODEL`         | Name of the ChatGPT model (recommended: `gpt-4o`). |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`  | Deployment name for the embedding model. |
+| `AZURE_OPENAI_EMBEDDING_MODEL`       | Name of the embedding model (recommended: `text-embedding-3-large`). |
+| `AZURE_OPENAI_MAX_TOKENS`            | Maximum number of tokens allowed in responses. |
+| `AZURE_OPENAI_RESOURCE`              | Azure OpenAI resource name (used to build the endpoint). |
+| `AZURE_SEARCH_API_VERSION`           | Azure Search API version (recommended: `2024-07-01`). |
+| `AZURE_SEARCH_APPROACH`              | Search approach to be used (recommended: `hybrid`). |
+| `AZURE_SEARCH_INDEX`                 | Name of the Azure Search index (e.g., `ragindex`). |
+| `AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG`| Name of the semantic search configuration. |
+| `AZURE_SEARCH_SERVICE`               | Azure Search service name. |
+| `AZURE_SEARCH_TOP_K`                 | Maximum number of search results to return. |
+| `AZURE_SEARCH_USE_SEMANTIC`          | Enable (`true`) or disable (`false`) semantic search. |
+| `AZURE_STORAGE_ACCOUNT`              | Storage account name where documents are stored. |
+| `PYTHON_ENABLE_INIT_INDEXING`        | `1` | Enables initial Python indexing. |
+| `PYTHON_ISOLATE_WORKER_DEPENDENCIES` | `1` | Isolates Python worker dependencies. |
+
+#### Azure App Service Specific Settings
+
+These variables must be configured directly in Azure App Service as **Application Settings**, and do not need to be included in your local `.env` file. The recommended values are provided below.
+
+| **Variable**                         | **Recommended Value** | **Description** |
+|--------------------------------------|----------------------|-----------------|
+| `AzureWebJobsStorage__accountName`   | _your storage account name_ | Storage account used by Azure Functions. |
+| `AzureWebJobsStorage__credential`    | `managedidentity` | Credential type for storage access. |
+| `BUILD_FLAGS`                        | `UseExpressBuild` | Enables express build mode. |
+| `ENABLE_ORYX_BUILD`                  | `true` | Enables the Oryx build system. |
+| `SCM_DO_BUILD_DURING_DEPLOYMENT`     | `true` | Builds the app during deployment. |
+| `WEBSITE_HTTPLOGGING_RETENTION_DAYS` | `1` | Number of days to retain HTTP logs. |
+| `XDG_CACHE_HOME`                     | `/tmp/.cache` | Cache directory used during build/runtime. |
+| `FUNCTIONS_EXTENSION_VERSION`        | `~4` | Specifies the Azure Functions runtime version. |
+| `FUNCTIONS_WORKER_RUNTIME`           | `python` | Azure Functions worker runtime. |
+
 
 ### Cloud Deployment
 

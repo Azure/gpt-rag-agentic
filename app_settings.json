@@ -1,0 +1,168 @@
+[
+    {
+      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+      "value": "InstrumentationKey=<your-instrumentation-key>;IngestionEndpoint=https://<region>.in.applicationinsights.azure.com/;LiveEndpoint=https://<region>.livediagnostics.monitor.azure.com/;ApplicationId=<your-application-id>",
+      "slotSetting": false
+    },
+    {
+      "name": "AUTOGEN_ORCHESTRATION_STRATEGY",
+      "value": "multimodal_rag",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_DB_ID",
+      "value": "<your-cosmos-db-account-id>",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_DB_NAME",
+      "value": "<your-cosmos-db-name>",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_KEY_VAULT_NAME",
+      "value": "<your-key-vault-name>",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_API_KEY",
+      "value": "<your-openai-api-key>",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_API_VERSION",
+      "value": "2024-10-21",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_CHATGPT_DEPLOYMENT",
+      "value": "chat",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_CHATGPT_MODEL",
+      "value": "gpt-4o",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+      "value": "text-embedding",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_EMBEDDING_MODEL",
+      "value": "text-embedding-3-large",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_MAX_TOKENS",
+      "value": "1000",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_OPENAI_RESOURCE",
+      "value": "azure-oai-common",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_API_VERSION",
+      "value": "2024-07-01",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_APPROACH",
+      "value": "hybrid",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_INDEX",
+      "value": "ragindex",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG",
+      "value": "my-semantic-config",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_SERVICE",
+      "value": "ai-search-common",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_TOP_K",
+      "value": "3",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_SEARCH_USE_SEMANTIC",
+      "value": "false",
+      "slotSetting": false
+    },
+    {
+      "name": "AZURE_STORAGE_ACCOUNT",
+      "value": "<your-storage-account>",
+      "slotSetting": false
+    },
+    {
+      "name": "AzureWebJobsStorage__accountName",
+      "value": "<your-functions-storage-account>",
+      "slotSetting": false
+    },
+    {
+      "name": "AzureWebJobsStorage__credential",
+      "value": "managedidentity",
+      "slotSetting": false
+    },
+    {
+      "name": "BUILD_FLAGS",
+      "value": "UseExpressBuild",
+      "slotSetting": false
+    },
+    {
+      "name": "ENABLE_ORYX_BUILD",
+      "value": "true",
+      "slotSetting": false
+    },
+    {
+      "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+      "value": "true",
+      "slotSetting": false
+    },
+    {
+      "name": "WEBSITE_HTTPLOGGING_RETENTION_DAYS",
+      "value": "1",
+      "slotSetting": false
+    },
+    {
+      "name": "XDG_CACHE_HOME",
+      "value": "/tmp/.cache",
+      "slotSetting": false
+    },
+    {
+      "name": "PYTHON_ENABLE_INIT_INDEXING",
+      "value": "1",
+      "slotSetting": false
+    },
+    {
+      "name": "PYTHON_ISOLATE_WORKER_DEPENDENCIES",
+      "value": "1",
+      "slotSetting": false
+    },
+    {
+      "name": "LOGLEVEL",
+      "value": "INFO",
+      "slotSetting": false
+    },
+    {
+      "name": "FUNCTIONS_EXTENSION_VERSION",
+      "value": "~4",
+      "slotSetting": false
+    },
+    {
+      "name": "FUNCTIONS_WORKER_RUNTIME",
+      "value": "python",
+      "slotSetting": false
+    }
+  ]
+  

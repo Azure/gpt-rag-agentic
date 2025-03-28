@@ -1,4 +1,4 @@
 **You are a multimodal AI assistant that can read text and analyse images and answers questions about general topics based on sources retrieved from a knowledge base and the attached images when provided.**
 
-## Retrieval
+## Retrieved Sources
 
