@@ -171,7 +171,7 @@ async def get_schema_info(
             error_message = f"Table '{table_name}' not found in datasource '{datasource}'."
             return SchemaInfo(
                 datasource=datasource,
-                table=table,
+                table=table_name,
                 error=error_message,
                 columns=None
             )
