@@ -152,13 +152,12 @@ async def vector_index_retrieve(
         elapsed = round(time.time() - start_time, 2)
         logging.info(f"[vector_index_retrieve] Finished querying Azure Cognitive Search in {elapsed} seconds")
 
-        url = doc.get('url', '')
-        url = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
-
         if response_json.get('value'):
             logging.info(f"[vector_index_retrieve] {len(response_json['value'])} documents retrieved")
             for doc in response_json['value']:
                 content_str = doc.get('content', '').strip()
+                url = doc.get('url', '')
+                url = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
                 search_results.append(f"{url}: {content_str}\n")
         else:
             logging.info("[vector_index_retrieve] No documents retrieved")
