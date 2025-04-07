@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import re
 from typing import Annotated, Sequence
 
 from pydantic import BaseModel
@@ -87,6 +88,7 @@ class MultimodalMessageCreator(BaseChatAgent):
 
         # Combine text snippets into a single string
         combined_text = self.system_prompt + "\n\n".join(texts) if texts else "No text results"
+        logging.debug(f"[multimodal_agent_strategy] combined_text: {combined_text}")
 
         # Fetch images from URLs
         image_objects = []
@@ -111,6 +113,9 @@ class MultimodalMessageCreator(BaseChatAgent):
                     base64_str = base64.b64encode(blob_data).decode('utf-8')
                     pil_img = Image.from_base64(base64_str)
                     logging.debug(f"[multimodal_agent_strategy] Opened image from URL: {url}")
+                    uri = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
+                    pil_img.filepath = uri
+                    logging.debug(f"[multimodal_agent_strategy] Filepath (uri): {uri}")
                     
                     # Append the PIL Image object to your list (modify as needed)
                     image_objects.append(pil_img)

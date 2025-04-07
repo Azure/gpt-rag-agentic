@@ -1,101 +1,147 @@
-# function_app.py
-import asyncio
+#!/usr/bin/env python3
 import os
+import sys
 import json
+import requests
+import argparse
+import datetime
+import re
 import logging
-import warnings
-import azure.functions as func
-from azurefunctions.extensions.http.fastapi import Request, StreamingResponse, JSONResponse
-from orchestration import RequestResponseOrchestrator, StreamingOrchestrator, OrchestratorConfig
 
-# User Warning configuration
-import warnings
-# Available options for USER_WARNING_FILTER:
-#   ignore  - never show the warning
-#   always  - always show the warning
-#   error   - turn the warning into an exception
-#   once    - show the warning only once
-#   module  - show the warning only once per module
-#   default - default Python behavior
-user_warning_filter = os.environ.get('USER_WARNING_FILTER', 'ignore').lower()
-warnings.filterwarnings(user_warning_filter, category=UserWarning)
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
 
-# Logging configuration
-4
-logging.getLogger("azure").setLevel(os.environ.get('AZURE_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("httpx").setLevel(os.environ.get('HTTPX_LOGLEVEL', 'ERROR').upper())
-logging.getLogger("httpcore").setLevel(os.environ.get('HTTPCORE_LOGLEVEL', 'ERROR').upper())
-logging.getLogger("openai._base_client").setLevel(os.environ.get('OPENAI_BASE_CLIENT_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("urllib3").setLevel(os.environ.get('URLLIB3_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("urllib3.connectionpool").setLevel(os.environ.get('URLLIB3_CONNECTIONPOOL_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("openai").setLevel(os.environ.get('OPENAI_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("autogen_core").setLevel(os.environ.get('AUTOGEN_CORE_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("autogen_core.events").setLevel(os.environ.get('AUTOGEN_EVENTS_LOGLEVEL', 'WARNING').upper())
-logging.getLogger("uvicorn.error").propagate = True
-logging.getLogger("uvicorn.access").propagate = True
+# Regex to extract a UUID at the start of a chunk.
+UUID_REGEX = re.compile(
+    r'^\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s+',
+    re.IGNORECASE
+)
 
-# Create the Function App with the desired auth level.
-app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
+def extract_conversation_id_from_chunk(chunk: str):
+    """
+    Extracts a UUID conversation ID from the beginning of a text chunk.
 
-@app.route(route="orc", methods=[func.HttpMethod.POST])
-async def orc(req: Request) -> JSONResponse:
-    data = await req.json()
-    conversation_id = data.get("conversation_id")
-    question = data.get("question")
-
-    # Gather client principal info (optional)
-    client_principal = {
-        "id": data.get("client_principal_id", "00000000-0000-0000-0000-000000000000"),
-        "name": data.get("client_principal_name", "anonymous"),
-        "group_names": data.get("client_group_names", "")
-    }
-    access_token = data.get("access_token", None)
+    Args:
+        chunk (str): The text chunk from the orchestrator response.
     
-    if question:
-        orchestrator = RequestResponseOrchestrator(conversation_id, OrchestratorConfig(), client_principal, access_token)
-        result = await orchestrator.answer(question)
-        return JSONResponse(content=result)
-    else:
-        return JSONResponse(content={"error": "no question found in json input"}, status_code=400)
+    Returns:
+        tuple: (conversation_id (str or None), cleaned_chunk (str))
+    """
+    match = UUID_REGEX.match(chunk)
+    if match:
+        conv_id = match.group(1)
+        logging.info("Extracted Conversation ID: %s", conv_id)
+        return conv_id, chunk[match.end():]
+    return None, chunk
 
-@app.route(route="orcstream", methods=[func.HttpMethod.POST])
-async def orchestrator_streaming(req: Request) -> StreamingResponse:
-    data = await req.json()
-    conversation_id = data.get("conversation_id")
-    question = data.get("question")
-    optimize_for_audio = data.get("optimize_for_audio", False)    
+def send_question_to_rest_api(uri, function_key, question, conversation_id):
+    """
+    Sends the question to the REST API endpoint and returns its streaming text response,
+    while extracting the conversation ID from the first chunk.
 
-    # Gather client principal info (optional)
-    client_principal = {
-        "id": data.get("client_principal_id", "00000000-0000-0000-0000-000000000000"),
-        "name": data.get("client_principal_name", "anonymous"),
-        "group_names": data.get("client_group_names", "")
-    }
-    access_token = data.get("access_token", None)
+    Args:
+        uri (str): The API endpoint URL.
+        function_key (str): The API access key.
+        question (str): The question to process.
+        conversation_id (str): The conversation identifier to send (may be empty).
     
-    if question:
-        orchestrator = StreamingOrchestrator(conversation_id, OrchestratorConfig(), client_principal, access_token)
-        orchestrator.set_optimize_for_audio(optimize_for_audio)
+    Returns:
+        tuple: (extracted_conversation_id (str or None), complete text response (str))
+    """
+    headers = {
+        "x-functions-key": function_key,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "conversation_id": conversation_id,
+        "question": question
+    }
+    try:
+        response = requests.post(uri, headers=headers, json=payload, stream=True)
+        response.raise_for_status()
+        result_text = ""
+        extracted_conv_id = None
+        # Iterate over streaming response lines.
+        for chunk in response.iter_lines(decode_unicode=True):
+            if chunk:
+                # On the first non-empty chunk, try to extract the conversation ID.
+                if extracted_conv_id is None:
+                    extracted_conv_id, chunk = extract_conversation_id_from_chunk(chunk)
+                result_text += chunk + "\n"
+        return extracted_conv_id, result_text.strip()
+    except Exception as e:
+        error_msg = f"Error: {str(e)}"
+        return None, error_msg
 
-        async def stream_generator():
-            logging.info("[orcstream_endpoint] Entering stream_generator")
-            last_yield = asyncio.get_event_loop().time()
-            heartbeat_interval = 15  # seconds between heartbeats
-            heartbeat_count = 0
+def main():
+    parser = argparse.ArgumentParser(
+        description="Simple evaluation script using a REST API with streaming text response."
+    )
+    parser.add_argument(
+        "--input", type=str, default="evaluations/input/test-dataset.jsonl",
+        help="Path to the input JSONL file."
+    )
+    parser.add_argument(
+        "--output-folder", type=str, default="evaluations/output/",
+        help="Directory where the output JSONL file will be saved."
+    )
+    args = parser.parse_args()
 
-            async for chunk in orchestrator.answer(question):
-                now = asyncio.get_event_loop().time()
-                # If the time since the last yield exceeds the heartbeat interval, send a heartbeat
-                if now - last_yield >= heartbeat_interval:
-                    heartbeat_count += 1
-                    logging.info(f"Sending heartbeat #{heartbeat_count}")
-                    yield "\n\n"
-                    last_yield = now
-                if chunk:
-                    # logging.info(f"Yielding chunk: {chunk}")
-                    # For text-only mode, yield the raw chunk; else, serialize to JSON.
-                    yield chunk
-                    last_yield = now
-        return StreamingResponse(stream_generator(), media_type="text/event-stream")
-    else:
-        return JSONResponse(content={"error": "no question found in json input"}, status_code=400)
+    input_file = args.input
+    output_folder = args.output_folder
+
+    # Verify that the input file exists.
+    if not os.path.exists(input_file):
+        print(f"Input file '{input_file}' not found.")
+        sys.exit(1)
+
+    # Create the output folder if it doesn't exist.
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Get REST API configuration from environment variables.
+    endpoint = os.getenv("ORCHESTRATOR_ENDPOINT")
+    function_key = os.getenv("FUNCTION_KEY")
+    if not endpoint or not function_key:
+        print("Environment variables ORCHESTRATOR_ENDPOINT and FUNCTION_KEY must be set.")
+        sys.exit(1)
+
+    # Build the output filename using the input file's base name plus a datetime stamp.
+    base_name = os.path.basename(input_file)
+    name, ext = os.path.splitext(base_name)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_folder, f"{name}_{timestamp}{ext}")
+
+    with open(input_file, "r", encoding="utf-8") as fin, \
+         open(output_file, "w", encoding="utf-8") as fout:
+        for line in fin:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                record = json.loads(line)
+            except Exception as e:
+                print(f"Skipping invalid JSON line: {line}")
+                continue
+
+            # Support both "query" and "question" keys.
+            question = record.get("query", record.get("question", ""))
+            ground_truth = record.get("ground_truth", "")
+            conversation = record.get("conversation", "")
+
+            # Call the REST API and get both the conversation_id and the streaming response text.
+            extracted_conv_id, response_text = send_question_to_rest_api(
+                endpoint, function_key, question, conversation
+            )
+
+            # Save the results in the output record.
+            record["response"] = response_text
+            record["context"] = ""  # Placeholder for additional context if needed.
+            record["conversation_id"] = extracted_conv_id if extracted_conv_id else conversation
+
+            fout.write(json.dumps(record) + "\n")
+
+    print(f"Output written to: {output_file}")
+
+if __name__ == "__main__":
+    main()

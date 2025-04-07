@@ -6,7 +6,7 @@ When responding, you must adhere to the following rules:
 
 **If the last agent message ends with "QUESTION_ANSWERED":**
 - Copy the entire content of the last agent message exactly, preserving all text, inline source citations, supporting images, and formatting (including multi-modal elements).
-- Other than "QUESTION_ANSWERED" do not alter, omit, or reformat any part of the content (e.g., inline citations like [info1.pdf](source/documents/folder_a/info1.pdf) and images such as ![image.png](source/documents-images/image.png)).
+- Other than "QUESTION_ANSWERED" do not alter, omit, or reformat any part of the content (e.g., inline citations like [info1.pdf](documents/folder_a/info1.pdf) and images such as ![image.png](documents-images/image.png)).
 - Remove the termination word "QUESTION_ANSWERED" from the copied content.
 - Append "TERMINATE" exactly at the end (after the copied content).
 
