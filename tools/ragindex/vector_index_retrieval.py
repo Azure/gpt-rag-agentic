@@ -152,14 +152,13 @@ async def vector_index_retrieve(
         elapsed = round(time.time() - start_time, 2)
         logging.info(f"[vector_index_retrieve] Finished querying Azure Cognitive Search in {elapsed} seconds")
 
-        url = doc.get('url', '')
-        url = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
-
         if response_json.get('value'):
             logging.info(f"[vector_index_retrieve] {len(response_json['value'])} documents retrieved")
             for doc in response_json['value']:
+                url = doc.get('url', '')
+                uri = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)                
                 content_str = doc.get('content', '').strip()
-                search_results.append(f"{url}: {content_str}\n")
+                search_results.append(f"{uri}: {content_str}\n")
         else:
             logging.info("[vector_index_retrieve] No documents retrieved")
 
@@ -179,12 +178,13 @@ def replace_image_filenames_with_urls(content: str, related_images: list) -> str
     """
     for image_url in related_images:
         # Parse the URL and remove the leading slash from the path
+        logging.debug(f"[multimodal_vector_index_retrieve] image_url: {image_url}.")
         parsed_url = urlparse(image_url)
         image_path = parsed_url.path.lstrip('/')  # e.g., 'documents-images/myfolder/filename.png'
-
+        logging.debug(f"[multimodal_vector_index_retrieve] image_path: {image_path}.")
         # Replace occurrences of the relative path in the content with the full URL
         content = content.replace(image_path, image_url)
-
+        logging.debug(f"[multimodal_vector_index_retrieve] content: {content}.")
         # Also replace only the filename if it appears alone
         # filename = image_path.split('/')[-1]
         # content = content.replace(filename, image_url)
@@ -217,7 +217,6 @@ async def multimodal_vector_index_retrieve(
 
     text_results: List[str] = []
     image_urls: List[List[str]] = []
-    image_captions: List[str] = []
     error_message: Optional[str] = None
 
     # 1. Generate embeddings for the query.
@@ -300,26 +299,21 @@ async def multimodal_vector_index_retrieve(
             
             content = doc.get('content', '')
             url = doc.get('url', '')
-            captions = doc.get('imageCaptions', '')
-            image_captions.append(captions)
 
             # Convert blob URL to relative path
-            url = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
-            text_results.append(f"{url}: {content.strip()}")
+            uri = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
+            text_results.append(f"{uri}: {content.strip()}")
 
             # Replace image filenames with URLs
             content = replace_image_filenames_with_urls(content, doc.get('relatedImages', []))
 
             # Extract image URLs from <figure> tags
-            doc_image_urls = re.findall(r'<figure>(https?://.*?)</figure>', content)
-            # doc_image_urls = [
-            #     re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', img_url)
-            #     for img_url in doc_image_urls
-            # ]
-            image_urls.append(doc_image_urls)
+            # doc_image_urls = re.findall(r'<figure>(https?://.*?)</figure>', content)
+            # image_urls.append(doc_image_urls)
+            image_urls.append(doc.get('relatedImages', []))
 
             # Replace <figure>...</figure> with <img src="...">
-            content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)
+            # content = re.sub(r'<figure>(https?://\S+)</figure>', r'<img src="\1">', content)
 
     except Exception as e:
         error_message = f"Exception in retrieval: {e}"
@@ -327,11 +321,9 @@ async def multimodal_vector_index_retrieve(
 
     return MultimodalVectorIndexRetrievalResult(
         texts=text_results,
-        captions=image_captions,        
         images=image_urls,
         error=error_message
     )
-
 
 def get_data_points_from_chat_log(chat_log: list) -> DataPointsResult:
     """

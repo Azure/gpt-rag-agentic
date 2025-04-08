@@ -322,7 +322,7 @@ def main():
                 # Prepare the output data
                 output_data = {
                     "Question": question,
-                    "Ground Truth": ground_truth,
+                    "Ground ground_truth": ground_truth,
                     "Answer": response_data.get('answer', 'No answer provided.'),
                     "Context": response_data.get('data_points', 'No data points provided.'),
                     "Reasoning": response_data.get('reasoning', 'No reasoning provided.'),

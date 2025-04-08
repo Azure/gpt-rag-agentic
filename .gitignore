@@ -23,6 +23,8 @@ __azurite*
 qa_flow_quality_eval.jsonl
 responses.jsonl
 prompty-answer-score-eval.xlsx
+evaluations/input/
+evaluations/output/
 
 # C extensions
 *.so

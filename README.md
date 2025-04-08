@@ -134,10 +134,6 @@ Ensure the `AUTOGEN_ORCHESTRATION_STRATEGY` environment variable is correctly se
 
 ## Running the Orchestrator
 
-Below are the three deliverables you requested. We’ve kept only the non‐optional variables (except for BUILD_FLAGS and XDG_CACHE_HOME, which you want in app settings) and removed FUNCTION_KEY and AZURE_STORAGE_CONTAINER. The extra variables listed below are kept only in the app settings and not in the local .env file.
-
----
-
 ### Environment Variables
 
 To successfully run the orchestrator Function App, you must configure the following environment variables. These variables should be defined locally using the `.env` file (following the structure from `.env.template`) and in cloud environments, such as Azure Function App, via the `app_settings.json` file in the Application Settings section.

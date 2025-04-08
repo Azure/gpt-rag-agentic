@@ -5,7 +5,7 @@
 We provide an evaluation program to assess the performance of the GPT-RAG Orchestrator by:
 
 1. Generating answers to a set of test questions.
-2. Evaluating the generated answers based on similarity to ground truth and groundedness in provided context.
+2. Evaluating the generated answers based on similarity to ground ground_truth and groundedness in provided context.
 
 The program processes test data, invokes the orchestrator for each question, and then evaluates the responses using predefined scoring guidelines. The final results, including detailed scores and explanations, are saved in an Excel file for further analysis.
 
@@ -90,7 +90,7 @@ By creating `test-dataset.custom.jsonl`, you can evaluate the orchestrator using
 
 ### Default Test Data
 
-If you do not provide a custom test dataset, the program will use the default sample data provided in `test-dataset.jsonl`. This file contains sample questions and ground truth answers for demonstration purposes.
+If you do not provide a custom test dataset, the program will use the default sample data provided in `test-dataset.jsonl`. This file contains sample questions and ground ground_truth answers for demonstration purposes.
 
 ## Program Workflow
 
@@ -113,7 +113,7 @@ The evaluation program performs the following steps:
 
 3. **Saving Responses:**
 
-   - Writes the question, ground truth, generated answer, context, reasoning, and processing time to `evaluations/responses.jsonl`.
+   - Writes the question, ground ground_truth, generated answer, context, reasoning, and processing time to `evaluations/responses.jsonl`.
 
 4. **Evaluation Run:**
 
@@ -186,7 +186,7 @@ The evaluation program assesses the orchestrator's responses based on two main c
 
 ### Similarity Scoring (GPT-Similarity)
 
-- **Objective:** Measure how similar the generated answer is to the ground truth.
+- **Objective:** Measure how similar the generated answer is to the ground ground_truth.
 - **Scoring Guidelines:**
   - **1:** Not at all similar.
   - **2:** Mostly not similar.
@@ -201,7 +201,7 @@ The evaluation program assesses the orchestrator's responses based on two main c
 - **Scoring Guidelines:**
   - **5:** Answer follows logically from the context.
   - **1:** Answer is logically false based on the context.
-  - **2-4 (or 1 if uncertain):** Cannot determine truthfulness without more information.
+  - **2-4 (or 1 if uncertain):** Cannot determine ground_truthfulness without more information.
 - **Considerations:** Evaluate the answer solely based on the context provided, disregarding external knowledge.
 
 ### Example
@@ -216,7 +216,7 @@ What is the capital of France?
 Paris
 ```
 
-**Ground Truth:**
+**Ground ground_truth:**
 ```
 Paris
 ```
