@@ -84,7 +84,8 @@ class MultimodalMessageCreator(BaseChatAgent):
 
         # Extract text and image data
         texts = retrieval_data.get("texts", [])
-        image_urls = retrieval_data.get("images", [])
+        image_urls_list = retrieval_data.get("images", [])
+        captions_lists = retrieval_data.get("captions", [])
 
         # Combine text snippets into a single string
         combined_text = self.system_prompt + "\n\n".join(texts) if texts else "No text results"
@@ -93,9 +94,11 @@ class MultimodalMessageCreator(BaseChatAgent):
         # Fetch images from URLs
         image_objects = []
         max_images = 50  # maximum number of images to process (Azure OpenaI GPT-4o limit)
-        image_count = 0    
-        for url_list in image_urls:  # Assuming each item in image_urls is a list of URLs
-            for url in url_list:  # Iterate through each URL in the sublist
+        image_count = 0
+        document_count = 0
+        for image_urls_list in image_urls_list:  # Assuming each item in image_urls is a list of URLs
+            image_count = 0
+            for url in image_urls_list:  # Iterate through each URL in the sublist
                 if image_count >= max_images:
                     logging.info(f"[multimodal_agent_strategy] Reached the maximum image limit of {max_images}. Stopping further downloads.")
                     break  # Stop processing more URLs                
@@ -116,7 +119,8 @@ class MultimodalMessageCreator(BaseChatAgent):
                     uri = re.sub(r'https://[^/]+\.blob\.core\.windows\.net', '', url)
                     pil_img.filepath = uri
                     logging.debug(f"[multimodal_agent_strategy] Filepath (uri): {uri}")
-                    
+                    pil_img.caption = captions_lists[document_count][image_count] if image_count < len(image_urls_list) else None                 
+
                     # Append the PIL Image object to your list (modify as needed)
                     image_objects.append(pil_img)
                     image_count += 1  # Increment the counter
@@ -124,7 +128,8 @@ class MultimodalMessageCreator(BaseChatAgent):
 
                 except Exception as e:
                     logging.error(f"[multimodal_agent_strategy] Could not load image from {url}: {e}")
-
+                image_count += 1  # Increment the image number for the next set of URLs
+            document_count += 1  # Increment the document number for the next set of URLs
 
         # Construct and return the MultiModalMessage response
         multimodal_msg = MultiModalMessage(

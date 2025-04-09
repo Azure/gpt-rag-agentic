@@ -29,8 +29,11 @@ class MultimodalVectorIndexRetrievalResult(BaseModel):
         ...,
         description="List of lists of image URLs; each inner list corresponds to a document's related images"
     )
+    captions: List[List[str]] = Field(
+        ...,
+        description="List of lists of captions; each inner list corresponds to a document's related captions"
+    )    
     error: Optional[str] = Field(None, description="Error message if query fails")
-
 
 # (Optional) For get_data_points_from_chat_log
 class DataPointsResult(BaseModel):

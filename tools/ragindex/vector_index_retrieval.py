@@ -170,6 +170,14 @@ async def vector_index_retrieve(
     sources = ' '.join(search_results)
     return VectorIndexRetrievalResult(result=sources, error=error_message)
 
+def extract_captions(str_captions):
+    # Regular expression pattern to match image references followed by their descriptions
+    pattern = r"\[.*?\]:\s(.*?)(?=\[.*?\]:|$)"
+    
+    # Find all matches
+    matches = re.findall(pattern, str_captions, re.DOTALL)
+
+    return [match.strip() for match in matches]
 
 def replace_image_filenames_with_urls(content: str, related_images: list) -> str:
     """
@@ -217,6 +225,7 @@ async def multimodal_vector_index_retrieve(
 
     text_results: List[str] = []
     image_urls: List[List[str]] = []
+    captions: List[str] = []
     error_message: Optional[str] = None
 
     # 1. Generate embeddings for the query.
@@ -296,8 +305,10 @@ async def multimodal_vector_index_retrieve(
         logging.info(f"[multimodal_vector_index_retrieve] Finished querying Azure AI Search in {response_time} seconds")
 
         for doc in response_json.get('value', []):
-            
+
             content = doc.get('content', '')
+            str_captions = doc.get('imageCaptions', '')        
+            captions.append(extract_captions(str_captions))
             url = doc.get('url', '')
 
             # Convert blob URL to relative path
@@ -322,6 +333,7 @@ async def multimodal_vector_index_retrieve(
     return MultimodalVectorIndexRetrievalResult(
         texts=text_results,
         images=image_urls,
+        captions=captions,
         error=error_message
     )
 
