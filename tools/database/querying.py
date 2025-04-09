@@ -1,3 +1,4 @@
+import os
 import sqlparse
 from typing import Annotated
 from .types import ValidateSQLQueryResult, ExecuteQueryResult
@@ -26,7 +27,8 @@ async def execute_dax_query(datasource: Annotated[str, "Target datasource"], que
     """
     try:
         cosmosdb = CosmosDBClient()
-        datasource_config = await cosmosdb.get_document('datasources', datasource)
+        datasources_container = os.environ.get('DATASOURCES_CONTAINER', 'datasources')
+        datasource_config = await cosmosdb.get_document(datasources_container, datasource)
         if not datasource_config or datasource_config.get("type") != "semantic_model":
             return ExecuteQueryResult(error=f"{datasource} datasource configuration not found or invalid for Semantic Model.")
     
@@ -58,7 +60,8 @@ async def execute_sql_query(
     try:
         # Fetch the datasource configuration
         cosmosdb = CosmosDBClient()
-        datasource_config = await cosmosdb.get_document('datasources', datasource)
+        datasources_container = os.environ.get('DATASOURCES_CONTAINER', 'datasources')
+        datasource_config = await cosmosdb.get_document(datasources_container, datasource)
 
         if not datasource_config:
             return ExecuteQueryResult(error=f"{datasource} datasource configuration not found.")

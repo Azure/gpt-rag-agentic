@@ -66,7 +66,8 @@ async def main():
     # Get datasource config
     datasource = os.getenv("FABRIC_DATASOURCE", None)
     cosmosdb = CosmosDBClient()
-    datasource_config = await cosmosdb.get_document('datasources', datasource)
+    datasources_container = os.environ.get('DATASOURCES_CONTAINER', 'datasources')
+    datasource_config = await cosmosdb.get_document(datasources_container, datasource)
 
     if not datasource_config:
         print(f"Could not read datasource configuration for {datasource} from CosmosDB.")
