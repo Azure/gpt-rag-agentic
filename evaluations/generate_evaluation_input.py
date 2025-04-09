@@ -8,6 +8,80 @@ import datetime
 import re
 import logging
 
+"""
+Evaluation Script Using REST API with Streaming Response
+
+This script reads input questions from a `.jsonl` file, sends them to a REST API endpoint,
+and writes the results to a new `.jsonl` file with additional metadata.
+
+The API is expected to support a streaming response with the option to include a UUID
+conversation ID in the first chunk of the response.
+
+Environment Variables:
+----------------------
+- ORCHESTRATOR_ENDPOINT : str
+    The URL of the REST API endpoint.
+- FUNCTION_KEY : str
+    The access key required to authenticate with the API.
+
+Command-line Arguments:
+-----------------------
+--input : str
+    Path to the input .jsonl file. Default is 'evaluations/input/test-dataset.jsonl'.
+--output-folder : str
+    Directory where the output .jsonl file will be saved. Default is 'evaluations/output/'.
+
+Input File Format (.jsonl):
+---------------------------
+Each line must be a JSON object with the following fields:
+
+- query (str) or question (str): The question to be sent to the REST API.
+- ground_truth (str, optional): Expected answer, used for evaluation or reference.
+- conversation (str, optional): Existing conversation ID for continued dialogue.
+
+Only one of `query` or `question` is required.
+
+Example:
+    {
+        "query": "What is Zero Trust?",
+        "ground_truth": "Zero Trust is a security model...",
+        "conversation": ""
+    }
+
+Output File Format (.jsonl):
+----------------------------
+Each output line is a JSON object with the same fields from the input, plus:
+
+- response (str): The text response returned by the REST API.
+- context (str): Placeholder for future context, currently empty.
+- conversation_id (str): UUID extracted from the response or reused from the input.
+
+Example:
+    {
+        "query": "What is Zero Trust?",
+        "ground_truth": "Zero Trust is a security model...",
+        "conversation": "",
+        "response": "Zero Trust is a framework that assumes...",
+        "context": "",
+        "conversation_id": "123e4567-e89b-12d3-a456-426614174000"
+    }
+
+Functions:
+----------
+- extract_conversation_id_from_chunk(chunk: str) -> tuple[str | None, str]:
+    Extracts a UUID conversation ID from the start of a text chunk, if present.
+
+- send_question_to_rest_api(uri: str, function_key: str, question: str, conversation_id: str) -> tuple[str | None, str]:
+    Sends a question to the API and returns the streaming response along with any extracted conversation ID.
+
+Usage:
+------
+    python3 script.py --input path/to/input.jsonl --output-folder path/to/output/
+
+This script can be used for testing, evaluation, and orchestration flows that rely on text generation via APIs.
+
+"""
+
 # Configure basic logging
 logging.basicConfig(level=logging.INFO)
 
