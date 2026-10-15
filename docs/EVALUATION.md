@@ -1,103 +1,112 @@
-# GPT-RAG Orchestrator Quality Evaluation
+# Evaluation input generation
 
-## Overview
+This guide describes
+[`generate_evaluation_input.py`](../evaluations/generate_evaluation_input.py).
+It sends questions to the streaming API and saves responses as JSON Lines.
+It does not calculate quality scores or run a load test.
+See the [repository status](../README.md#integration-status) before using this
+runtime.
 
-This guide walks you through the simplified evaluation process for the GPT-RAG Orchestrator using the script `generate_evaluation_input.py`. Instead of running a full evaluation pipeline locally, you will:
+## Prerequisites and environment
 
-1. Generate answers using your orchestrator and the script provided.
-2. Upload the results to the AI Foundry portal.
-3. Run evaluations such as **Groundedness** directly from the portal.
-
-## Step 1 – Environment Setup
-
-Before you begin, make sure the following are configured:
-
-### Prerequisites
-
-- **Python 3.10+**
-- **Python Packages:**
-  - `requests`
-
-Install required packages with:
+Run commands from the repository root. The generator imports `requests` and
+standard Python modules. `requests` is included in the root
+[`requirements.txt`](../requirements.txt).
+If you only need the generator, install its dependency in a virtual environment:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install requests
 ```
 
-### Environment Variables
+The script reads these variables from the process environment:
 
-The script uses two environment variables:
+| Variable | Use |
+| --- | --- |
+| `ORCHESTRATOR_STREAM_ENDPOINT` | Full streaming URL, normally `https://<function-app>.azurewebsites.net/api/orcstream`. |
+| `FUNCTION_KEY` | Function key sent in the `x-functions-key` header. |
 
-- `ORCHESTRATOR_STREAM_ENDPOINT`: Your orchestrator's endpoint for streaming responses.
-- `FUNCTION_KEY`: The API key for authentication.
+Both variables must be nonempty. The generator does not load `.env` files.
+Provide the key through your approved secret-handling process, not a command
+saved in shell history or a tracked file. Managed identity is used by runtime
+service connectors, but this generator does not implement token-based API
+authentication.
 
-Create a `.env` file or set the variables in your shell:
+The endpoint must already be running and reachable. Generating answers calls
+Azure services through the orchestrator and can incur costs. Use approved,
+non-sensitive test data.
 
-```env
-ORCHESTRATOR_STREAM_ENDPOINT=https://your-orchestrator-endpoint/api/orc/stream
-FUNCTION_KEY=your-function-key
+## Input
+
+Each nonempty line must be a JSON object with a `question` or `query` string.
+If both are present, the script uses `query`.
+`ground_truth` is optional and is preserved, not scored.
+
+```jsonl
+{"question": "What is Zero Trust?", "ground_truth": "An expected answer for comparison."}
+{"question": "How does that affect access decisions?", "followup": "yes"}
 ```
 
-## Step 2 – Prepare Test Data
+Only `followup: "yes"` reuses the last conversation ID extracted from a response.
+Other records start with an empty conversation ID. Input fields named
+`conversation` or `conversation_id` do not select the request's conversation.
+Blank lines are ignored, and invalid JSON lines are skipped with a message.
+The script does not validate all field types, so check your dataset first.
 
-Your test questions must be in JSON Lines format (`.jsonl`). Each line should contain a question and optionally a ground truth answer.
+## Generate responses
 
-### Example `test-dataset.jsonl`
-
-```json
-{"question": "What is Zero Trust?", "ground_truth": "Zero Trust is a security model..."}
-{"question": "Explain the benefits of Zero Trust architecture."}
-```
-
-You can place this file at `evaluations/input/test-dataset.jsonl` or specify a custom path using the `--input` flag.
-
-## Step 3 – Generate Evaluation Input
-
-Run the script to generate responses from your orchestrator:
+Two sample datasets are provided in [`evaluations/`](../evaluations/).
+The default input path, `evaluations/input/test-dataset.jsonl`, is not shipped.
+Specify an existing file:
 
 ```bash
-python evaluations/generate_evaluation_input.py
+python evaluations/generate_evaluation_input.py --input evaluations/sample-test-dataset-classic.jsonl --output-folder evaluations/output
 ```
 
-This script will:
+Choose a strategy and data sources that match the dataset. The NL2SQL sample is
+`evaluations/sample-test-dataset-nl2sql.jsonl`.
 
-- Read each question.
-- Call your orchestrator via REST API.
-- Save the responses (with optional conversation IDs) into a new `.jsonl` file under the `evaluations/output/` folder.
+The generator creates the output folder and writes a file named
+`<input-name>_<YYYYMMDD_HHMMSS><input-extension>`. It preserves input fields and
+adds or overwrites `response`, `context`, and `conversation_id`.
 
-### Output Example
-
-```json
-{
-  "question": "What is Zero Trust?",
-  "ground_truth": "Zero Trust is a security model...",
-  "response": "Zero Trust is a framework that assumes...",
-  "context": "",
-  "conversation_id": "123e4567-e89b-12d3-a456-426614174000"
-}
+```jsonl
+{"question": "What is Zero Trust?", "response": "An answer from the orchestrator.", "context": "", "conversation_id": "123e4567-e89b-12d3-a456-426614174000"}
 ```
 
-## Step 4 – Upload to AI Foundry
+The [streaming implementation](../orchestration/orchestrator.py) sends a
+conversation ID before model text. The generator tries to extract a leading
+UUID from the received lines and joins the remaining text. It does not parse a
+structured response containing retrieved sources.
 
-1. Open your [Azure AI Studio / AI Foundry project](https://ai.azure.com/) in your browser.
-2. Go to the **Evaluation** tab.
-3. Select **"New Evaluation"** and choose **"Upload Evaluation File"**.
-4. Upload the `.jsonl` output file you generated in Step 3.
-5. Choose the evaluation metric you want to run, such as **Groundedness**.
-6. Click **Run Evaluation**.
+Review the output before scoring it. Request failures are written as
+`Error: ...` response text rather than causing the whole run to fail.
+A completed file is not proof that every request succeeded.
 
-## Tips for Groundedness Evaluation
+## Scoring limitations
 
-- Ensure your orchestrator includes relevant **context** in the response if required by the evaluation prompt.
-- The AI Foundry evaluation will assess whether the answer logically follows from the context (even if context is currently empty).
-- You can edit the prompt template used by the evaluation engine in AI Foundry if you want to improve score interpretation.
+`context` is always an empty string in the generated file. This output alone is
+not sufficient for a groundedness evaluation that requires retrieval context.
+Supply actual retrieved evidence and map fields according to the evaluator you
+choose. Do not treat an empty context as evidence that an answer is grounded.
 
-## Conclusion
+You can use the file as input to a separate evaluation workflow, subject to that
+workflow's schema, permissions, and data-handling requirements. This repository
+does not automate a Foundry portal upload or define the portal's current UI.
+Portal steps and metric availability must be checked against current service
+documentation.
 
-This streamlined approach allows you to quickly evaluate the quality of your GPT-RAG Orchestrator using Azure AI Foundry’s built-in capabilities. You just need to:
+## Older evaluation scripts
 
-1. Generate response data using `generate_evaluation_input.py`.
-2. Upload the result to the AI Foundry portal.
-3. Run targeted evaluations like **Groundedness**, **Similarity**, or others available.
+`genai_evaluation.py`, `evaluate.sh`, and `evaluate.ps1` are separate legacy
+scripts, not wrappers for the generator above. They are not a working
+end-to-end evaluation path as shipped:
 
-You are free to modify the script or input format to better fit your use case or evaluation criteria.
+- `genai_evaluation.py` imports `Orchestrator`, which is not exported by
+  `orchestration/__init__.py`. This also blocks its REST mode.
+- The wrappers search for `test-*.jsonl`, not the shipped `sample-test-*.jsonl`
+  names.
+- The PowerShell wrapper constructs a nested
+  `evaluations/evaluations/genai_evaluation.py` path that does not exist.
+
+The separate `evaluations/requirements.txt` belongs to that older workflow.
+Do not install it as a requirement for the response generator.
