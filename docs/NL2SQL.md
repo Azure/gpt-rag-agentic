@@ -1,349 +1,172 @@
-# NL2SQL and Chat with Fabric Scenarios
+# NL2SQL and Fabric runtime reference
 
-This page provides an overview of how **NL2SQL**, **NL2SQL Few-Shot**, and **Chat with Fabric** scenarios work within the GPT-RAG Agentic Orchestrator. It explores the key components, including architecture, agent orchestration, authentication methods, and the configuration of data sources and data dictionaries.
+This page describes the implementations in this repository. It is not a
+validated deployment guide for the current Agent Landing Zone platform.
+See [integration status](../README.md#integration-status) and
+[local setup](LOCAL_DEPLOYMENT.md).
 
-## Table of Contents
+## Strategy implementations
 
-1. [**Architecture Overview**](#architecture-overview)
-2. [**Agent Orchestration Strategies**](#agent-orchestration-strategies)
-   - [2.1 Key Agents and Their Roles](#key-agents-and-their-roles)
-   - [2.2 Strategy Variations](#strategy-variations)
-3. **Prerequisites (by data source type)**
-   - [3.1 Azure SQL Databases](#azure-sql-databases)
-   - [3.2 Microsoft Fabric](#microsoft-fabric)
-4. [**Data Sources Configuration**](#data-sources-configuration)
-5. [**Data Dictionary**](#data-dictionary)
+Set `AUTOGEN_ORCHESTRATION_STRATEGY` in the runtime environment, not just in a
+remote API client's shell.
 
----
+| Strategy | Agents and tools defined in source |
+| --- | --- |
+| `nl2sql` | `sql_agent` and `chat_closure`. Tools list data sources and tables, read schema metadata, parse SQL, execute SQL, and obtain dates and times. |
+| `nl2sql_fewshot` | `assistant` and `chat_closure`. Adds similar-query retrieval to the SQL tools. It does not add a triage or DAX agent. |
+| `chat_with_fabric` | `triage_agent`, `sql_query_agent`, `dax_query_agent`, and `chat_closure`. Defines table, measure, and similar-query retrieval plus SQL and DAX execution tools. |
 
-## Architecture Overview
+The orchestrators use AutoGen `SelectorGroupChat`. Few-shot retrieval supplies
+examples to the agent. It does not train a model or guarantee query accuracy.
 
-These scenarios extend the GPT-RAG Agentic Orchestrator's ability to convert user requests into SQL or DAX queries, supporting **Azure SQL Database** and **Microsoft Fabric** as data sources.
+### Fabric integration gaps
 
-- In **NL2SQL** strategies, the orchestrator uses ODBC drivers to connect to Azure SQL databases. It can authenticate using either **Managed Identity** or **SQL Database authentication** with database credentials stored in **Azure Key Vault**.
+`chat_with_fabric` is registered in the factory, but it is not a working
+end-to-end path as shipped:
 
-- In **Chat with Fabric**, SQL endpoints are accessed using a **App Registration** (Service Principal) via ODBC. For semantic models like **Power BI datasets**, connections are made through the **REST API**, using either delegated authentication or a service principal depending on the scenario.
+- The orchestrators pass `output_mode` and `output_format` positionally to
+  `create_agents`. The Fabric strategy still accepts `text_only` and
+  `optimize_for_audio` in those positions.
+- Its closure agent requests `chat_closure.txt` or `chat_closure_audio.txt`.
+  Neither file exists in `prompts/chat_with_fabric/`. The shipped variants are
+  `chat_closure_json.txt`, `chat_closure_text.txt`, and `chat_closure_tts.txt`.
 
-![NL2SQL Architecture Diagram](../media/nlsql-architecture.png)
-*Architecture Overview*
+The connector details below describe source paths, not a claim that those
+strategy integration gaps have been fixed.
 
----
+## Authentication
 
-## Agent Orchestration Strategies
+### SQL databases
 
-The orchestrator employs a multi-agent system to process queries and manage conversations. Each strategy involves a team of agents, a set of tools, and a selector function that dynamically selects the next agent based on context.
+For `type: "sql_database"`, omitting `uid` selects an Entra token credential
+chain that tries managed identity and then Azure CLI credentials.
+Prefer this path where it fits your environment. The connector does not
+configure a user-assigned identity by client ID or create a database user.
+An administrator must grant the chosen identity appropriate database read
+permissions and network access.
 
-![Agent Team](../media/nl2sql-agent-and-tools.png)
-*Agent Team for NL2SQL Strategies*
+If `uid` is present, the connector uses SQL authentication and looks up the
+password in Key Vault. It does not read a password field from the data source
+document.
 
-### Key Agents and Their Roles:
+### Fabric SQL endpoints
 
-- **Triage Agent:** Analyzes user input, determines the appropriate action, and identifies the relevant data source.
-- **Query Agents:** Translate natural language into SQL or DAX queries. For **Few-Shot** scenarios, past queries are retrieved from an AI Search index to refine results.
-- **Chat Closure Agent:** Consolidates responses and appends a termination keyword when the conversation ends.
+For `type: "sql_endpoint"`, the connector uses ODBC service-principal
+authentication with `client_id`, `tenant_id`, and a Key Vault secret.
+It does not implement managed identity for this path.
+Both SQL connectors require ODBC Driver 18 for SQL Server.
 
-### Strategy Variations:
+### Fabric semantic models
 
-- **Chat with Fabric:** Includes all agents and tools shown above.
-- **NL2SQL Few-Shot:** Excludes the DAX Query Agent.
-- **NL2SQL:** Excludes both the DAX Query Agent and the tool for retrieving similar queries.
+The DAX execution path passes the API request's `access_token` to the Power BI
+Execute Queries API. It does not perform an on-behalf-of exchange.
+The connector contains a service-principal token helper, but the DAX execution
+method does not call it or fall back to it when a user token is missing.
+Do not assume that adding a client secret enables app-only DAX execution.
 
-> [!TIP]
-> You can create custom variations of these strategies to fit your project requirements.
+The caller needs a token accepted by the Power BI API and permissions for the
+target semantic model. Tenant settings and data-source permissions are
+external prerequisites, not provisioned or validated by this code. Consult
+the current [Execute Queries API documentation](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries)
+and [Fabric SQL authentication documentation](https://learn.microsoft.com/en-us/fabric/data-warehouse/entra-id-authentication).
+This guide does not prescribe a tenant-wide permission change.
 
----
+### Secret references
 
-## Prerequisites (by Data Source Type)
+Where a connector uses a secret, it derives the Key Vault name from
+`<datasource-id>-secret`. `generate_valid_secret_name` replaces characters
+other than letters, digits, and hyphens with hyphens, trims edge hyphens, and
+limits the result to 63 characters.
+`AZURE_KEY_VAULT_NAME` selects the vault, and secret retrieval uses managed
+identity followed by Azure CLI credentials.
 
-The orchestrator supports different authentication methods depending on the data source used. This section outlines the prerequisites for each data source type. Specific configuration instructions are provided in the next section.
+Keep secret values out of data source JSON, documentation, and shell history.
+Use your approved secret-management process for any required credentials.
 
-### **Azure SQL Databases**
+### Query safety limitations
 
-When connecting to **Azure SQL Databases**, you have two authentication options:
+`validate_sql_query` uses `sqlparse.parse` and treats a nonempty parse result
+as valid. It is not full SQL syntax or permission validation.
+`execute_sql_query` checks whether the trimmed query starts with `select`
+before sending it to the database. This prefix check is not a read-only
+security boundary. Use a least-privilege database identity, and review generated
+queries before using this code with sensitive data.
 
-- **Managed Identity (Preferred):** Uses the system-assigned or user-assigned identity of the Orchestrator Azure Function. The prerequisite is to ensure that the orchestrator’s managed identity has the `db_datareader` role on the target database.
+## Data source documents
 
-- **SQL Server Authentication:** Requires a `uid` and password for a user with read access to the database. The password must be stored in **Azure Key Vault**, following the naming convention `{datasource_id}-secret`. Configuration details are provided in the next section.
+Data sources are JSON documents in the existing Cosmos DB container selected
+by `DATASOURCES_CONTAINER` (default `datasources`).
+The execution tools retrieve a document using its ID as both the item key and
+partition key. The dictionary's `datasource` value must match that ID.
 
-### **Microsoft Fabric**
+The models in [`connectors/types.py`](../connectors/types.py) require:
 
-The Microsoft Fabric connector can be configured in one of the following modes:
+| Type | Fields |
+| --- | --- |
+| All types | `id`, `description`, `type` |
+| `sql_database` | `server`, `database`, and optional `uid` |
+| `sql_endpoint` | `server`, `database`, `tenant_id`, `client_id` |
+| `semantic_model` | `organization`, `workspace`, `dataset`, `tenant_id`, `client_id` |
 
-- **SQL Endpoint:** Used for executing SQL queries on lakehouses and warehouses.
-- **Semantic Model:** Used for executing DAX queries on Power BI datasets.
-
-#### **SQL Endpoint**
-
-SQL Endpoint connections use the **Microsoft ODBC Driver** and authenticate via an **App Registration** in **Entra ID**.
-
-The prerequisites include:
-
-1. Creating an App Registration in Entra ID.
-2. Adding the App Registration to a security group for easier access management.
-3. Enabling **Service principals can use Fabric APIs** under **Developer settings** in the tenant.
-
-![Fabric Configuration - Semantic Model](../media/semantic-model-configuration02.png)  
-*Developer settings*
-
-4. Assigning the Viewer role to the App Registration or security group in the target workspace.
-
-For more details, refer to: [Entra ID Authentication for SQL Endpoint](https://learn.microsoft.com/en-us/fabric/data-warehouse/entra-id-authentication).
-
-#### **Semantic Model**
-
-Semantic model connections are based on the **Power BI REST API** and require the following:
-
-1. Creating an App Registration in Entra ID.
-2. Adding the App Registration to a security group for access management.
-3. Grant **Dataset.Read.All** permission to your App Service: Go to **App Registration > API permissions > Add a permission**, select **Power BI Service > Delegated permissions**, then choose **Dataset.Read.All**.
-
-4. Enabling **Semantic Model Execute Queries REST API** under **Integration settings** in the tenant.
-
-![Fabric Configuration - Semantic Model](../media/semantic-model-configuration.png)  
-*Integration settings*
-
-5. Ensuring users have **dataset read** and **build permissions** on the semantic model.
-
-For more details, refer to: [Power BI REST API Guide](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/execute-queries).
-
----
-
-## Data Sources Configuration
-
-**Supported data source types include:**  
-- **Semantic Model:** Executes DAX queries using the Power BI REST API.  
-- **SQL Endpoint:** Connects via ODBC using a **Service Principal**.  
-- **SQL Database:** Connects via ODBC using **Managed Identity**.  
-
-Data source configuration in **GPT-RAG** is managed through JSON documents stored in the `datasources` container of **CosmosDB**. 
-
-![Sample Datasource Configuration](../media/admin-guide-datasource-configuration.png)
-<BR>*Sample Datasource Configuration*
-
-### **Semantic Model Example**
-```json
-{
-    "id": "wwi-sales-aggregated-data",    
-    "description": "Aggregated sales data for insights such as sales by employee or city.",
-    "type": "semantic_model",
-    "organization": "myorg",
-    "dataset": "your_dataset_or_semantic_model_name",
-    "tenant_id": "your_sp_tenant_id",
-    "client_id": "your_sp_client_id"    
-}
-```
-
-### **SQL Endpoint Example**
-```json
-{
-    "id": "wwi-sales-star-schema",
-    "description": "Star schema with sales data and dimension tables.",
-    "type": "sql_endpoint",
-    "organization": "myorg",
-    "server": "your_sql_endpoint.fabric.microsoft.com",
-    "database": "your_lakehouse_name",
-    "tenant_id": "your_sp_tenant_id",
-    "client_id": "your_sp_client_id"
-}
-```
-
-### **SQL Database Example**
-```json
-{
-    "id": "adventureworks",
-    "description": "AdventureWorksLT database with customers, orders, and products.",
-    "type": "sql_database",
-    "database": "adventureworkslt",
-    "server": "sqlservername.database.windows.net"
-}
-```
-
-For data sources that require secrets—such as those accessed via a **Service Principal** or **SQL Server** using SQL authentication—passwords are stored in **Azure Key Vault** following the naming convention `{datasource_id}-secret`.  
-
-**Example:** If the `datasource_id` is `wwi-sales-star-schema`, the corresponding secret name in Key Vault should be `wwi-sales-star-schema-secret`.
-
-![Sample Datasource Secrets](../media/admin-guide-datasource-secrets.png)
-<BR>*Sample Datasource Secrets*
-
-> [!Tip]
-> Example data source configuration files are available in the [sample folder](../samples/fabric/datasources.json).
-
----
-
-## **Data Dictionary**
-
-The Data Dictionary is essential for **NL2SQL** and **Chat with Fabric** scenarios, providing metadata about queries, tables, and measures that the orchestrator uses to generate optimized SQL and DAX queries. This section explains how to document the data dictionary and outlines the indexing process.
-
-### **How to Document the Data Dictionary**
-
-The data dictionary includes three types of content:
-
-- **Tables:** Descriptions of tables used by the chatbot to generate queries. In the column descriptions, provide at least the column names and their descriptions; optionally, you can include data types and example values for greater clarity
-- **Queries:** Sample queries used for few-shot learning by the orchestrator. These are optional, use this only for frequently used queries that help optimize the AI agents' performance.
-- **Measures:** Definitions of measures for **Semantic Model** data sources, including name, description, data type, and source information. Only include measures that are essential and beneficial for the chatbot to answer user questions clearly and accurately.
-
-Each content type is represented as a JSON file with specific attributes and should be organized into folders:
-
-- **`tables/`**: Store JSON files that describe tables.
-- **`measures/`**: Store JSON files that define measures.
-- **`queries/`**: Store JSON files that contain sample queries.
-
-The file names are flexible and should follow a clear naming convention for easy identification:
-
-- Table files should be named after the table (e.g., `dimension_city.json`).
-- Measure files should use the measure name (e.g., `total_revenue.json`).
-- Query files should have descriptive names that indicate their purpose (e.g., `top_5_expensive_products.json`).
-
-> [!NOTE]
-> The `datasource` field can be any name of your choice. This name will be used to reference the datasource within GPT-RAG and must contain only alphanumeric characters and dashes.
-
-### **Data Dictionary Elements**
-
-Before the examples, here are the field descriptions for each element type:
-
-#### **Tables**
-- **table:** The name of the table.  
-- **description:** A brief description of the table's purpose and content.  
-- **datasource:** The data source where the table resides.  
-- **columns:** A list of columns within the table, each with the following attributes:  
-  - **name:** The name of the column.  
-  - **description:** A brief description of the column's content.  
-  - **type:** (Optional) The data type of the column, using the datasource's type names.
-  - **examples:**  (Optional) Sample values that the column might contain.  
-
-#### **Queries**
-- **datasource:** The data source where the query is executed.  
-- **question:** The natural language question that the query answers.  
-- **query:** The SQL or DAX query that retrieves the desired data.  
-- **reasoning:**  (Optional) An explanation of how the query works and its purpose.  
-
-#### **Measures**
-- **datasource:** The data source where the measure is defined.  
-- **name:** The name of the measure.  
-- **description:** A brief description of what the measure calculates.  
-- **type:** "external" (from another model) or "local" (calculated within the current model). 
-- **source_table:** (Local only) The table associated with the local measure.  
-- **data_type:** (External only) Measure's data type (e.g., CURRENCY, INTEGER, FLOAT).  
-- **source_model:** (External only) The source model for external measures.  
-
----
-
-### **Examples**
-
-#### **Tables**
-
-Example of table metadata file with example column values:
+For example, a SQL database using token authentication has no `uid` or password:
 
 ```json
 {
-    "table": "dimension_city",
-    "description": "City dimension table containing details of locations associated with sales and customers.",
-    "datasource": "wwi-sales-star-schema",
-    "columns": [
-        { "name": "CityKey", "description": "Primary key for city records.", "type": "int", "examples": [1, 2, 3, 4, 5] },
-        { "name": "City", "description": "Name of the city.", "type": "string", "examples": ["New York", "London", "Tokyo", "Paris", "Sydney"] },
-        { "name": "Population", "description": "Population of the city.", "type": "int", "examples": [8419600, 8982000, 13929286, 2148000, 5312000] }
-    ]
+  "id": "adventureworks",
+  "description": "AdventureWorksLT sample database.",
+  "type": "sql_database",
+  "database": "adventureworkslt",
+  "server": "sqlservername.database.windows.net"
 }
 ```
 
-Example of simplified table metadata file with only required attributes:
+The semantic model's `dataset` is the dataset ID used in the request URL,
+not a display name. Although `workspace` and `organization` are required by the
+model, the current execution URL uses `/v1.0/myorg/datasets/<dataset>/executeQueries`.
 
-```json
-{
-    "table": "sales_order",
-    "description": "Table containing sales order data, including order IDs, dates, and customer information.",
-    "datasource": "wwi-sales-data",
-    "columns": [
-        { "name": "OrderID", "description": "Unique identifier for each sales order." },
-        { "name": "OrderDate", "description": "Date when the sales order was placed." },
-        { "name": "CustomerName", "description": "Name of the customer who placed the order." }
-    ]
-}
-```
+The [SQL sample](../samples/sql_database/datasources.json) and
+[Fabric samples](../samples/fabric/datasources.json) are starting points, not
+ready-to-run resource configurations. The Fabric semantic model sample omits
+the required `workspace` field and describes `dataset` as a name.
+Supply the required fields and actual IDs in your own configuration.
+The runtime does not import these sample files into Cosmos DB.
 
-#### **Queries**
+## Data dictionary and Search indexes
 
-Example of an SQL query file:
+The tools consume metadata already stored in Azure AI Search. This repository
+does not ship index definitions, indexers, embedding skillsets, upload scripts,
+or an indexing schedule for that metadata. The former ingestion diagram is
+not a provisioning contract.
 
-```json
-{
-    "datasource": "adventureworks",
-    "question": "What are the top 5 most expensive products currently available for sale?",
-    "query": "SELECT TOP 5 ProductID, Name, ListPrice FROM SalesLT.Product WHERE SellEndDate IS NULL ORDER BY ListPrice DESC",
-    "reasoning": "This query retrieves the top 5 products with the highest selling prices that are currently available for sale."
-}
-```
+| Consumer | Index and fields used |
+| --- | --- |
+| `get_all_tables_info` and `get_schema_info` | Fixed `nl2sql-tables` index. Reads `table`, `description`, `datasource`, and `columns` with column `name` and `description`. |
+| `tables_retrieval` | `NL2SQL_TABLES_INDEX`, default `nl2sql-tables`. Searches text and/or `contentVector`, depending on the approach, and selects `table` and `description`. |
+| `queries_retrieval` | `NL2SQL_QUERIES_INDEX`, default `nl2sql-queries`. Selects `question`, `query`, and `reasoning`, and can filter by `datasource`. Vector search uses `contentVector`. |
+| `measures_retrieval` | Fixed `nl2sql-measures` index. Filters by `datasource` and reads `name`, `description`, `type`, `source_table`, `data_type`, and `source_model`. It does not perform vector search. |
 
-Example of a DAX query file:
+Changing `NL2SQL_TABLES_INDEX` does not redirect the fixed-index schema tools.
+Do not assume one override changes all table lookups.
+Queries use a fixed top count of 3, table relevance retrieval uses 10, and
+table and measure listing use up to 1000 results. These tools do not use
+`AZURE_SEARCH_TOP_K`.
 
-```json
-{
-    "datasource": "wwi-sales-aggregated-data",
-    "question": "Who are the top 5 employees with the highest total sales including tax?",
-    "query": "EVALUATE TOPN(5, SUMMARIZE(aggregate_sale_by_date_employee, aggregate_sale_by_date_employee[Employee], aggregate_sale_by_date_employee[SumOfTotalIncludingTax]), aggregate_sale_by_date_employee[SumOfTotalIncludingTax], DESC)",
-    "reasoning": "This DAX query identifies the top 5 employees based on the total sales amount including tax."
-}
-```
+Search uses `AZURE_SEARCH_SERVICE` and `AZURE_SEARCH_API_VERSION`.
+Query and table relevance retrieval support `term`, `vector`, and `hybrid`
+through `AZURE_SEARCH_APPROACH`. They generate a query embedding even in
+`term` mode. Semantic mode uses `AZURE_SEARCH_USE_SEMANTIC` and
+`AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG` when the approach is not vector-only.
+Your indexes must support the fields, filters, and vector dimensions used by
+these requests.
 
-#### **Measures**
+Existing table and query metadata examples are in
+[`samples/sql_database/`](../samples/sql_database/) and
+[`samples/fabric/`](../samples/fabric/). Column types and example values in
+metadata are not returned by `get_schema_info`, which maps column names to
+descriptions. Measure metadata accepts `type` values `local` and `external`.
+Those labels describe metadata, not an automated measure deployment.
 
-Example of an external measure JSON:
-
-```json
-{
-    "datasource": "Ecommerce",
-    "name": "Total Revenue (%)",
-    "description": "Calculates the percentage of total revenue for the selected period.",
-    "type": "external",
-    "data_type": "CURRENCY",
-    "source_model": "Executive Sales Dashboard"
-}
-```
-
-Example of a local measure JSON:
-
-```json
-{
-    "datasource": "SalesDatabase",
-    "name": "Total Orders",
-    "description": "Counts the total number of sales orders for the selected period.",
-    "type": "local",
-    "source_table": "sales_order"
-}
-```
-
-> [!Tip]
-> You can find more exampes in the [samples folder](../samples/).
-
-### **How to Ingest the Data Dictionary**
-
-Every data dictionary element is indexed into an AI Search Index based on its element type: measure, table, or query. This process is handled by an AI Search Indexer, which runs on a scheduled basis or can be triggered manually. 
-
-The diagram below illustrates the NL2SQL data ingestion pipeline:  
-
-![NL2SQL Ingestion Pipeline](../media/nl2sql_ingestion_pipeline.png)
-<BR>*NL2SQL Ingestion Pipeline*
-
-#### **Workflow Description**
-
-1. File Detection:
-   - The AI Search indexers scan their designated folders:
-     - `queries-indexer` scans the `queries` folder.
-     - `tables-indexer` scans the `tables` folder.
-     - `measures-indexer` scans the `measures` folder.
-
-2. Vector Embedding:
-   - The indexer uses the `#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill` to generate vector embeddings with Azure OpenAI Embeddings.
-     - For queries, the `question` field is vectorized.
-     - For tables, the `description` field is vectorized.
-     - For measures, the `description` field is vectorized.
-
-3. Content Indexing:
-   - The vectorized content is added to the respective Azure AI Search indexes:
-     - Queries are indexed in `nl2sql-queries`.
-     - Tables are indexed in `nl2sql-tables`.
-     - Measures are indexed in `nl2sql-measures`.
-
-> [!NOTE]  
-> For proper indexing, ensure that files are placed in their designated folders, as the indexers only scan specific subfolders.
+Arrange and index metadata using a separately verified process. Folder names
+such as `tables/` and `queries/` in the samples do not trigger ingestion in
+this runtime, and no optional ingestion or current platform integration is
+implied.

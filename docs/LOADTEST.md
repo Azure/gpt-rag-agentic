@@ -1,7 +1,28 @@
-## Performance evaluation
+# Performance measurement scope
 
-Measuring performance and latency is crucial to ensure a timely and frictionless user experience. It's important to assess these factors to guarantee prompt and smooth delivery of the expected benefit.
+This repository does not include a load-test harness, a workload definition, or
+published performance targets. The
+[evaluation input generator](EVALUATION.md) sends questions sequentially. It is
+not a concurrent load test.
 
-The interactions with LLM may have several layers between the user and the LLM, like web frontend, network connections, making it vital to monitor and measure the delay at each stage. This evaluation, however, specifically focuses on the orchestrator.
+For a performance study of this runtime, define an external test plan for the
+actual [API routes](LOCAL_DEPLOYMENT.md#api-contract):
 
-Please refer to the [Enterprise RAG load test docs](https://github.com/Azure/GPT-RAG/blob/main/docs/LOADTEST.md) to know more about how to load test Enterprise RAG.
+- Measure end-to-end latency separately from time to first streamed text.
+- Record the strategy, model deployment, dataset, concurrency, and service
+  limits used in the test.
+- Track failed requests and error text as well as latency. A completed response
+  or evaluation output file is not proof of a successful answer.
+- Use approved test data and an isolated test environment with cost and load
+  limits.
+
+The request-response orchestrator logs its elapsed answer time. That timer is
+not a measurement of frontend or network latency. `host.json` contains
+Application Insights sampling settings, but this repository does not provide a
+load-test dashboard or a benchmark acceptance threshold.
+
+The old link to a GPT-RAG load-test page did not establish compatibility with
+this API. For maintained platform guidance, use the
+[Agent Landing Zone documentation](https://azure.github.io/AI-Landing-Zones/agent-landing-zone/).
+That platform does not pin this runtime in its v4.3.0 manifest. See
+[integration status](../README.md#integration-status).
